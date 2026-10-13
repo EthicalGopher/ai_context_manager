@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=AI Context Workspace
+Comment=Fresh sessions. Smarter context. Better coding.
+Exec=aicw %f
+Icon=aicw
+Terminal=false
+Categories=Development;
+MimeType=inode/directory;
+StartupWMClass=aicw
