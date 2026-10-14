@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"syscall"
 
 	"aicw/internal/agents"
 )
@@ -25,19 +24,6 @@ type termDef struct {
 	pre  []string
 }
 
-// {dir} is substituted with the working directory as a single argument.
-var termDefs = []termDef{
-	{"konsole", []string{"--workdir", "{dir}", "-e"}},
-	{"gnome-terminal", []string{"--working-directory={dir}", "--"}},
-	{"kitty", []string{"--directory", "{dir}"}},
-	{"alacritty", []string{"--working-directory", "{dir}", "-e"}},
-	{"wezterm", []string{"start", "--cwd", "{dir}", "--"}},
-	{"foot", []string{"--working-directory={dir}"}},
-	{"xfce4-terminal", []string{"--working-directory={dir}", "-x"}},
-	{"xterm", []string{"-e"}},
-	{"x-terminal-emulator", []string{"-e"}},
-}
-
 // ListTerminals returns terminal emulators found on PATH.
 func ListTerminals() []Terminal {
 	var out []Terminal
@@ -51,8 +37,8 @@ func ListTerminals() []Terminal {
 
 // FindTerminal picks the preferred terminal by name, or the first available.
 func FindTerminal(pref string) (Terminal, error) {
-	if runtime.GOOS != "linux" {
-		return Terminal{}, fmt.Errorf("automatic terminal launch is only implemented on Linux (this is %s); use the copyable command instead", runtime.GOOS)
+	if len(termDefs) == 0 {
+		return Terminal{}, fmt.Errorf("automatic terminal launch is not implemented on %s; use the copyable command instead", runtime.GOOS)
 	}
 	ts := ListTerminals()
 	if len(ts) == 0 {
@@ -95,19 +81,11 @@ func Launch(t Terminal, spec agents.LaunchSpec) (int, error) {
 		return 0, fmt.Errorf("working directory unavailable: %s", spec.Dir)
 	}
 	cmd := t.Command(spec)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	detach(cmd)
 	if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("failed to start %s: %w", t.Name, err)
 	}
 	pid := cmd.Process.Pid
 	go cmd.Wait() // reap; the terminal may fork and exit immediately
 	return pid, nil
-}
-
-// Alive reports whether a process with this PID exists.
-func Alive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	return syscall.Kill(pid, 0) == nil
 }

@@ -41,7 +41,7 @@ A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, 
 
 ## Download and install
 
-Linux (x86-64) is the supported platform today. Windows and macOS are **not built or tested**.
+Linux (x86-64) is the supported platform today. Windows is **experimental** (it cross-compiles and vets cleanly but has not been run on a real Windows machine; build with `scripts\build.ps1`). macOS is **not built or tested**.
 
 ### 1. Install the system libraries
 
@@ -122,7 +122,8 @@ By default in `~/.local/share/aicw` (override with `AICW_DATA_DIR`): `aicw.db` (
 | Embedded terminal | PTY layer tested in Go; xterm rendering checked in headless Chrome with canned output. Typing into a live agent in the real window was **not** exercised |
 | AI tools (MCP / `aicw tool`) | Tested through the real binary and Go tests. Claude Code's `--mcp-config` hookup is built from its documented flags but **not run against a real Claude session** |
 | Voice | Recording format verified on a real mic; offline engine run on synthetic speech (imperfect transcript; expect better with real speech or the `small` model). Live dictation end to end not verified |
-| Windows / macOS | **Not supported yet** (PTY and terminal launch are Unix-only) |
+| Windows | **Experimental.** ConPTY terminal, Windows Terminal/cmd launch, taskkill-based stop, `%LOCALAPPDATA%\aicw` data dir and ffmpeg/DirectShow voice recording are implemented; the exe cross-compiles and `go vet` passes, but nothing has run on Windows yet |
+| macOS | **Not supported yet** (terminal launch and voice recording are not implemented) |
 | Release artifacts | Tarball builds and installs locally. CI and release workflows have never run |
 
 Details: [docs/TESTING.md](docs/TESTING.md).
