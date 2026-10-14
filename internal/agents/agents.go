@@ -226,7 +226,7 @@ func (r *Registry) Detect(ctx context.Context, id string) Status {
 	}
 	exe := r.Paths[id]
 	if exe != "" {
-		if fi, err := os.Stat(exe); err != nil || fi.IsDir() || fi.Mode()&0o111 == 0 {
+		if fi, err := os.Stat(exe); err != nil || fi.IsDir() || (runtime.GOOS != "windows" && fi.Mode()&0o111 == 0) {
 			st.State, st.Detail = StatusNeedsConfig, "configured path is not an executable file: "+exe
 			return st
 		}

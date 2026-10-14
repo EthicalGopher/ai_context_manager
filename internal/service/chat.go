@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"aicw/internal/agents"
@@ -275,10 +274,7 @@ func (s *Service) TermStart(o TermStartOptions) (*TermInfo, error) {
 		"PATH="+filepath.Dir(selfExe)+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	if agent == "shell" {
-		exe = os.Getenv("SHELL")
-		if exe == "" {
-			exe = "/bin/bash"
-		}
+		exe = defaultShell()
 		info.Command = exe
 	} else {
 		prof, ok := s.Reg.Get(agent)
@@ -718,8 +714,7 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 	cmd.Dir = w.Path
 	cmd.Env = append(os.Environ(), "TERM=dumb", "NO_COLOR=1", "AICW_WORKSPACE="+w.Path, fmt.Sprintf("AICW_CONVERSATION=%d", convID),
 		"PATH="+filepath.Dir(selfExe)+string(os.PathListSeparator)+os.Getenv("PATH"))
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	killTreeOnCancel(cmd)
 	if launch.Stdin != "" {
 		cmd.Stdin = strings.NewReader(launch.Stdin)
 	}
