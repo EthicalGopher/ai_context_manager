@@ -5,7 +5,8 @@
 | `aicw-<v>-linux-amd64.tar.gz` + `.sha256` | `scripts/package.sh <v>` | **Built and install-tested** locally |
 | Source install | `scripts/build.sh` then symlink | Works |
 | AppImage / deb / rpm | — | Not provided |
-| Windows / macOS | — | Not built or tested; no signing/notarization claimed |
+| Windows | `scripts/build.ps1` → `build\bin\aicw.exe` | Experimental, untested on real Windows; no code signing |
+| macOS | — | Not built or tested; no signing/notarization claimed |
 | GitHub release workflow | `.github/workflows/release.yml` on `v*` tags | Written, **never run** |
 
 The tarball contains the single `aicw` binary (it is both app and CLI), icon, `.desktop` entry, `install.sh`, `uninstall.sh`, README and CHANGELOG. Verify with `sha256sum -c aicw-<v>-linux-amd64.tar.gz.sha256`.

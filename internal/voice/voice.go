@@ -9,13 +9,14 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unicode"
 )
@@ -38,19 +39,13 @@ type Engine struct {
 
 // Recorder wraps one recording process.
 type Recorder struct {
-	mu   sync.Mutex
-	cmd  *exec.Cmd
-	file string
-	out  bytes.Buffer
+	mu    sync.Mutex
+	cmd   *exec.Cmd
+	stdin io.WriteCloser
+	file  string
+	out   bytes.Buffer
 	// Argv overrides the recorder command (tests). {file} is substituted.
 	Argv []string
-}
-
-var recorders = [][]string{
-	{"pw-record", "--rate", "16000", "--channels", "1", "--format", "s16", "{file}"},
-	{"parecord", "--file-format=wav", "--format=s16le", "--rate=16000", "--channels=1", "{file}"},
-	{"arecord", "-q", "-f", "S16_LE", "-r", "16000", "-c", "1", "-t", "wav", "{file}"},
-	{"ffmpeg", "-loglevel", "error", "-y", "-f", "pulse", "-i", "default", "-ar", "16000", "-ac", "1", "{file}"},
 }
 
 // RecorderTool returns the first available recorder's name, or "".
@@ -79,6 +74,13 @@ func (r *Recorder) argv(file string) ([]string, error) {
 	out := make([]string, len(src))
 	for i, a := range src {
 		out[i] = strings.ReplaceAll(a, "{file}", file)
+		if strings.Contains(out[i], "{device}") {
+			dev, err := audioDevice()
+			if err != nil {
+				return nil, err
+			}
+			out[i] = strings.ReplaceAll(out[i], "{device}", dev)
+		}
 	}
 	return out, nil
 }
@@ -103,24 +105,28 @@ func (r *Recorder) Start(dir string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	r.out.Reset()
 	cmd.Stderr = &r.out
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("cannot start %s: %w", argv[0], err)
 	}
-	r.cmd, r.file = cmd, file
+	r.cmd, r.stdin, r.file = cmd, stdin, file
 	return nil
 }
 
-// Stop ends the recording (SIGINT so the WAV header is finalised) and
+// Stop ends the recording (gracefully, so the WAV header is finalised) and
 // returns the audio file path.
 func (r *Recorder) Stop() (string, error) {
 	r.mu.Lock()
-	cmd, file := r.cmd, r.file
-	r.cmd = nil
+	cmd, stdin, file := r.cmd, r.stdin, r.file
+	r.cmd, r.stdin = nil, nil
 	r.mu.Unlock()
 	if cmd == nil {
 		return "", errors.New("not recording")
 	}
-	cmd.Process.Signal(syscall.SIGINT)
+	interruptRecorder(cmd, stdin)
 	done := make(chan struct{})
 	go func() { cmd.Wait(); close(done) }()
 	select {
@@ -181,7 +187,24 @@ func splitArgs(s string) []string {
 
 // VenvPython is where the optional offline engine is installed.
 func VenvPython(dataDir string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(dataDir, "voice", "venv", "Scripts", "python.exe")
+	}
 	return filepath.Join(dataDir, "voice", "venv", "bin", "python")
+}
+
+// systemPython finds a Python 3 interpreter (python3 on Unix; python or the
+// py launcher on Windows).
+func systemPython() (string, error) {
+	for _, c := range []string{"python3", "python", "py"} {
+		if p, err := exec.LookPath(c); err == nil {
+			if runtime.GOOS == "windows" && c != "py" && strings.Contains(strings.ToLower(p), `windowsapps`) {
+				continue // Microsoft Store stub, not a real interpreter
+			}
+			return p, nil
+		}
+	}
+	return "", errors.New("python3 is required for offline voice setup")
 }
 
 func moduleAvailable(py, mod string) bool {
@@ -209,7 +232,7 @@ func Detect(dataDir string, s Settings) (Engine, bool) {
 		return Engine{Name: "custom command not found"}, false
 	}
 	script := filepath.Join(dataDir, "voice", "transcribe.py")
-	for _, py := range []string{VenvPython(dataDir), "python3"} {
+	for _, py := range []string{VenvPython(dataDir), "python3", "python"} {
 		if _, err := exec.LookPath(py); err != nil {
 			continue
 		}
@@ -285,9 +308,9 @@ func Transcribe(ctx context.Context, e Engine, audio string) (string, error) {
 // Setup creates an app-private virtual environment with faster-whisper.
 // progress receives human-readable lines. It needs network access.
 func Setup(ctx context.Context, dataDir string, progress func(string)) error {
-	py, err := exec.LookPath("python3")
+	py, err := systemPython()
 	if err != nil {
-		return errors.New("python3 is required for offline voice setup")
+		return err
 	}
 	venv := filepath.Join(dataDir, "voice", "venv")
 	run := func(name string, args ...string) error {

@@ -8,12 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"sync"
-	"syscall"
 	"time"
-
-	"github.com/creack/pty"
 )
 
 const scrollback = 512 * 1024
@@ -29,8 +25,7 @@ type Spec struct {
 type Session struct {
 	ID  string
 	PID int
-	cmd *exec.Cmd
-	f   *os.File
+	pty ptyConn
 
 	mu   sync.Mutex
 	buf  []byte
@@ -61,23 +56,22 @@ func (m *Manager) Start(sp Spec) (*Session, error) {
 	if sp.Rows == 0 {
 		sp.Rows = 30
 	}
-	cmd := exec.Command(sp.Exe, sp.Args...)
-	cmd.Dir = sp.Dir
-	cmd.Env = sp.Env
-	f, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: sp.Cols, Rows: sp.Rows})
+	p, err := startPTY(sp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start %s: %w", sp.Exe, err)
 	}
 	m.mu.Lock()
 	m.next++
-	s := &Session{ID: fmt.Sprintf("t%d", m.next), PID: cmd.Process.Pid, cmd: cmd, f: f, done: make(chan struct{})}
+	s := &Session{ID: fmt.Sprintf("t%d", m.next), PID: p.Pid(), pty: p, done: make(chan struct{})}
 	m.sessions[s.ID] = s
 	m.mu.Unlock()
 
+	readDone := make(chan struct{})
 	go func() {
+		defer close(readDone)
 		chunk := make([]byte, 32*1024)
 		for {
-			n, err := f.Read(chunk)
+			n, err := p.Read(chunk)
 			if n > 0 {
 				d := append([]byte(nil), chunk[:n]...)
 				s.mu.Lock()
@@ -91,18 +85,23 @@ func (m *Manager) Start(sp Spec) (*Session, error) {
 				}
 			}
 			if err != nil {
-				break
+				return
 			}
 		}
-		err := cmd.Wait()
-		code := 0
-		if ee, ok := err.(*exec.ExitError); ok {
-			code = ee.ExitCode()
+	}()
+	go func() {
+		code := p.Wait()
+		// Let the reader drain what the process wrote last. Windows ConPTY
+		// never reports EOF until it is closed, so don't wait forever.
+		select {
+		case <-readDone:
+		case <-time.After(300 * time.Millisecond):
 		}
 		s.mu.Lock()
 		s.code = code
 		s.mu.Unlock()
-		f.Close()
+		p.Close()
+		<-readDone
 		close(s.done)
 		if m.OnExit != nil {
 			m.OnExit(s.ID, code)
@@ -143,7 +142,7 @@ func (m *Manager) Write(id string, data []byte) error {
 	if !s.Alive() {
 		return errors.New("terminal process has exited")
 	}
-	_, err = s.f.Write(data)
+	_, err = s.pty.Write(data)
 	return err
 }
 
@@ -155,7 +154,7 @@ func (m *Manager) Resize(id string, cols, rows uint16) error {
 	if !s.Alive() || cols == 0 || rows == 0 {
 		return nil
 	}
-	return pty.Setsize(s.f, &pty.Winsize{Cols: cols, Rows: rows})
+	return s.pty.Resize(cols, rows)
 }
 
 // Buffer returns recent output so a re-attached view can repaint.
@@ -169,7 +168,7 @@ func (m *Manager) Buffer(id string) []byte {
 	return append([]byte(nil), s.buf...)
 }
 
-// Close stops the process (SIGHUP, then SIGKILL after a grace period) and
+// Close stops the process (hang-up, then a forced kill after a grace period) and
 // forgets the session once it has exited.
 func (m *Manager) Close(id string) error {
 	s, err := m.get(id)
@@ -177,13 +176,11 @@ func (m *Manager) Close(id string) error {
 		return err
 	}
 	if s.Alive() {
-		syscall.Kill(-s.PID, syscall.SIGHUP)
-		s.cmd.Process.Signal(syscall.SIGHUP)
+		s.pty.Terminate(false)
 		select {
 		case <-s.done:
 		case <-time.After(2 * time.Second):
-			syscall.Kill(-s.PID, syscall.SIGKILL)
-			s.cmd.Process.Kill()
+			s.pty.Terminate(true)
 			<-s.done
 		}
 	}
@@ -206,4 +203,14 @@ func (m *Manager) CloseAll() {
 	}
 }
 
-var _ io.Writer = (*os.File)(nil)
+// ptyConn is a started process attached to a pseudo-terminal. The Unix
+// implementation uses a PTY; Windows uses ConPTY.
+type ptyConn interface {
+	io.ReadWriteCloser
+	Resize(cols, rows uint16) error
+	Pid() int
+	// Wait blocks until the process exits and returns its exit code.
+	Wait() int
+	// Terminate asks the process (and its children) to stop; force kills it.
+	Terminate(force bool)
+}
