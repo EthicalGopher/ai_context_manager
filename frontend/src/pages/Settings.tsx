@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, errMsg, onEvent } from '../lib/api'
 import { useStore } from '../store'
 import { Button, Card, Confirm, ErrorBox, PageHeader } from '../components/ui'
+import { LocalModels } from '../components/LocalModels'
 
 export default function Settings() {
   const [s, setS] = useState<any>(null)
@@ -65,6 +66,7 @@ export default function Settings() {
       </Card>
       {confirmSetup && <Confirm title="Install offline voice?" confirmLabel="Install" onCancel={() => setConfirmSetup(false)} onConfirm={async () => { setConfirmSetup(false); setSetup([]); setSetupErr(''); try { await api.VoiceSetup(true) } catch (e) { setError(errMsg(e)) } }}>
         <p className="text-sm">This creates a private Python environment inside AICW's data folder and downloads <b>faster-whisper</b> (tens of MB) from the Python package index. The speech model (about 150 MB for “base”) downloads the first time you dictate. Nothing outside AICW's folder is changed. Requires python3 and a network connection.</p></Confirm>}
+      <LocalModels />
       <Card title="Diagnostics" className="mt-4" actions={<Button onClick={async () => setDoctor(await api.Doctor())}>Run aicw doctor</Button>}>
         {doctor ? <pre className="max-h-72 overflow-auto text-xs">{doctor}</pre> : <p className="text-sm text-mute">Checks installation, PATH, data directory, database and agent CLIs.</p>}
       </Card>

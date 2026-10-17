@@ -366,6 +366,26 @@ export function VoiceCancel() {
   return window['go']['service']['Service']['VoiceCancel']();
 }
 
+export function LocalEngineInstall(arg1) {
+  return window['go']['service']['Service']['LocalEngineInstall'](arg1);
+}
+
+export function LocalModelDelete(arg1, arg2) {
+  return window['go']['service']['Service']['LocalModelDelete'](arg1, arg2);
+}
+
+export function LocalModelDownload(arg1, arg2) {
+  return window['go']['service']['Service']['LocalModelDownload'](arg1, arg2);
+}
+
+export function LocalModels() {
+  return window['go']['service']['Service']['LocalModels']();
+}
+
+export function LocalServerStop() {
+  return window['go']['service']['Service']['LocalServerStop']();
+}
+
 export function ListModels(arg1, arg2) {
   return window['go']['service']['Service']['ListModels'](arg1, arg2);
 }
