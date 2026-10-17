@@ -20,6 +20,7 @@ import (
 	"aicw/internal/rules"
 	"aicw/internal/storage"
 	"aicw/internal/term"
+	"aicw/internal/transcript"
 	"aicw/internal/voice"
 )
 
@@ -64,7 +65,75 @@ func (s *Service) DeleteConversation(id int64, confirmed bool) error {
 }
 
 func (s *Service) Messages(convID, afterID int64) ([]storage.Message, error) {
+	s.mirrorTerminal(convID)
 	return s.Store.Messages(convID, afterID, 0)
+}
+
+// mirrorTerminal copies what was typed and answered in the conversation's
+// terminal (read from the agent's own session transcript) into the chat, so
+// the chat view and the terminal show one conversation and chat replies can
+// continue it. It is idempotent and silent on any problem.
+func (s *Service) mirrorTerminal(convID int64) {
+	conv, err := s.Store.Conversation(convID)
+	if err != nil || conv.SessionID == 0 || (conv.Agent != "claude" && conv.Agent != "") {
+		return
+	}
+	sess, err := s.Store.Session(conv.SessionID)
+	if err != nil || sess.Agent != "claude" || sess.ExternalID == "" {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	path := transcript.FindClaude(home, sess.ExternalID)
+	if path == "" {
+		return
+	}
+	s.tmu.Lock()
+	if s.mirrorBusy[convID] {
+		s.tmu.Unlock()
+		return
+	}
+	s.mirrorBusy[convID] = true
+	off := s.mirrorOff[convID]
+	s.tmu.Unlock()
+	defer func() { s.tmu.Lock(); delete(s.mirrorBusy, convID); s.tmu.Unlock() }()
+
+	entries, next, err := transcript.ReadClaude(path, off)
+	if err != nil {
+		return
+	}
+	sent, sentAt, _ := s.Store.SentTexts(convID, 50)
+	ctxPrompt, _, _ := strings.Cut(agents.ContextPrompt, "{contextFile}")
+	for _, e := range entries {
+		role, source := storage.RoleAssistant, storage.SourceTerminal
+		if e.Role == "user" {
+			role = storage.RoleUser
+			if strings.HasPrefix(e.Text, ctxPrompt) || sentFromChat(e, sent, sentAt) {
+				continue // AICW's own opening prompt, or a message already shown from the composer
+			}
+		}
+		s.Store.AddMirrored(convID, role, source, e.Text, e.ID, e.At)
+	}
+	s.tmu.Lock()
+	s.mirrorOff[convID] = next
+	s.tmu.Unlock()
+}
+
+// sentFromChat reports whether a terminal user entry is the chat composer's
+// own message (typed into the terminal as a paste) rather than keyboard input.
+func sentFromChat(e transcript.Entry, bodies []string, times []time.Time) bool {
+	for i, b := range bodies {
+		b = strings.TrimSpace(b)
+		if b == "" || (e.Text != b && !strings.HasPrefix(e.Text, b+"\n[attached ")) {
+			continue
+		}
+		if d := e.At.Sub(times[i]); e.At.IsZero() || (d > -2*time.Minute && d < 2*time.Minute) {
+			return true
+		}
+	}
+	return false
 }
 
 type SendOptions struct {
