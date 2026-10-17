@@ -32,7 +32,7 @@ export function ModelPicker({ agent, className = '', onError }: { agent: string;
     Promise.all([api.GetSettings() as Promise<any>, api.ListAgents() as Promise<any[]>]).then(([s, list]) => {
       const p = list.find((a) => a.profile.id === agent)?.profile
       if (!live || !p?.modelArgs?.length) return
-      setSupported(true); setSaved(s.agentModels?.[agent] ?? '')
+      setSupported(true); setSaved(((v: string) => v.startsWith('aicw:') ? '' : v)(s.agentModels?.[agent] ?? ''))
       load(false)
     }).catch(() => {})
     return () => { live = false }
@@ -72,7 +72,7 @@ export function ModelPicker({ agent, className = '', onError }: { agent: string;
             {saved && !known && !loading && <option value={saved}>{saved}</option>}
             {groups.map((g) => (
               <optgroup key={g} label={g}>
-                {models.filter((m) => m.group === g).map((m) => <option key={m.id} value={m.id} disabled={m.id.startsWith('aicw-get:')}>{m.label === m.id ? m.label : `${m.label} (${m.id})`}</option>)}
+                {models.filter((m) => m.group === g).map((m) => <option key={m.id} value={m.id}>{m.label === m.id ? m.label : `${m.label} (${m.id})`}</option>)}
               </optgroup>))}
             <option value={CUSTOM}>Other… (type a name)</option>
           </select>

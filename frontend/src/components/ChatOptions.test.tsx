@@ -34,4 +34,15 @@ describe('ChatOptions', () => {
     await userEvent.click(screen.getByRole('button', { name: /Plain shell/ }))
     expect(screen.queryByText('Model')).toBeNull()
   })
+
+  it('lists downloaded local models in their own Local section and switches to Claude Code', async () => {
+    apiMock.LocalModels.mockResolvedValue({ models: [{ file: 'q.gguf', name: 'Qwen 7B' }] })
+    apiMock.SaveSettings.mockResolvedValue(undefined)
+    const onAgent = vi.fn()
+    render(<ChatOptions agent="agy" agents={agents} edits={false} onAgent={onAgent} onEdits={() => {}} onError={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: /AGY/ }))
+    await userEvent.selectOptions(await screen.findByLabelText('Local model'), 'aicw:q.gguf')
+    expect(apiMock.SaveSettings).toHaveBeenCalledWith(expect.objectContaining({ agentModels: { claude: 'aicw:q.gguf' } }))
+    expect(onAgent).toHaveBeenCalledWith('claude')
+  })
 })
