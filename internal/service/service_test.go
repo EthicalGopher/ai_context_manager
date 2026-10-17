@@ -867,15 +867,10 @@ func TestAICWLocalModelStartsEngineAndPointsClaudeAtIt(t *testing.T) {
 	if err := s.SaveSettings(st); err != nil {
 		t.Fatal(err)
 	}
-	if m := s.ListModels("claude", true); !func() bool {
-		for _, x := range m.Models {
-			if x.ID == "aicw:tiny-3b.gguf" && strings.HasPrefix(x.Group, "Local") {
-				return true
-			}
+	for _, x := range s.ListModels("claude", true).Models {
+		if strings.HasPrefix(x.ID, "aicw:") {
+			t.Fatalf("local models belong in their own Local section, not the agent's list: %+v", x)
 		}
-		return false
-	}() {
-		t.Fatalf("the downloaded model must be in the list: %+v", m)
 	}
 	r, _ := s.OpenWorkspace(project(t), false)
 	conv, _ := s.NewConversation(r.Workspace.ID, "", "claude")

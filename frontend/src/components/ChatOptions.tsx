@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiChevronDown, FiSliders } from 'react-icons/fi'
 import { ModelPicker } from './ModelPicker'
+import { LocalPicker } from './LocalPicker'
 
 interface AgentOpt { id: string; name: string }
 
@@ -41,6 +42,7 @@ export function ChatOptions({ agent, agents, edits, onAgent, onEdits, onError }:
               <ModelPicker agent={agent} onError={onError} />
               <p className="mt-1 text-xs text-mute">Applies from the next message. Nothing chosen means the agent picks its own.</p>
             </div>)}
+          {agent !== 'shell' && <LocalPicker agent={agent} onAgent={onAgent} onError={onError} />}
           <label className="flex cursor-pointer items-start gap-3">
             <input type="checkbox" aria-label="Allow file edits" checked={edits} onChange={(e) => onEdits(e.target.checked)} className="mt-0.5" />
             <span className="text-sm"><b>Allow file edits</b><span className="mt-0.5 block text-xs text-mute">Off: chat replies can read and answer but not change files. The terminal always uses the agent’s own permission prompts.</span></span>
