@@ -128,4 +128,22 @@ describe('Composer', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No audio recorder found.')
     expect(apiMock.VoiceStart).not.toHaveBeenCalled()
   })
+
+  it('offers the fixed / commands, completes with Enter, then sends the command text', async () => {
+    apiMock.SlashCommands.mockResolvedValue([
+      { name: 'grill-me', description: 'Interview me', usage: '[topic]' },
+      { name: 'write-pages', description: 'Save to pages' },
+    ])
+    const onSend = vi.fn().mockResolvedValue(undefined)
+    render(<Composer wsId={1} onSend={onSend} />)
+    const box = screen.getByLabelText('Message')
+    await userEvent.type(box, '/gr')
+    expect(await screen.findByRole('option', { name: /grill-me/ })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /write-pages/ })).toBeNull()
+    await userEvent.keyboard('{Enter}')
+    expect(box).toHaveValue('/grill-me ')
+    expect(onSend).not.toHaveBeenCalled()
+    await userEvent.type(box, 'login{Enter}')
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('/grill-me login', []))
+  })
 })

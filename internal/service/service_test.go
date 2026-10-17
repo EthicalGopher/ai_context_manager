@@ -803,3 +803,24 @@ func TestTerminalConversationIsMirroredIntoChat(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestSlashCommandShownAsTypedButAgentGetsFullPrompt(t *testing.T) {
+	s := newSvc(t)
+	fakeChatAgent(t, s, `last=""; for a in "$@"; do last="$a"; done; echo "got: $last"`)
+	r, _ := s.OpenWorkspace(project(t), false)
+	conv, _ := s.NewConversation(r.Workspace.ID, "", "fakeai")
+	if _, err := s.SendMessage(SendOptions{ConversationID: conv.ID, Text: "/grill-me the login page", Mode: "chat"}); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, s, conv.ID)
+	msgs, _ := s.Messages(conv.ID, 0)
+	if len(msgs) < 2 || msgs[0].Body != "/grill-me the login page" {
+		t.Fatalf("the typed command must be what the chat shows: %+v", msgs)
+	}
+	if !strings.Contains(msgs[1].Body, "Ask your first question now.") {
+		t.Fatalf("the agent must receive the expanded instructions: %q", msgs[1].Body)
+	}
+	if len(s.SlashCommands()) < 3 {
+		t.Fatal("commands should be listed")
+	}
+}
