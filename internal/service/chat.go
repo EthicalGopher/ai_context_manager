@@ -14,12 +14,14 @@ import (
 	"time"
 
 	"aicw/internal/agents"
+	"aicw/internal/commands"
 	"aicw/internal/contextbuilder"
 	"aicw/internal/markdown"
 	"aicw/internal/media"
 	"aicw/internal/rules"
 	"aicw/internal/storage"
 	"aicw/internal/term"
+	"aicw/internal/transcript"
 	"aicw/internal/voice"
 )
 
@@ -64,7 +66,75 @@ func (s *Service) DeleteConversation(id int64, confirmed bool) error {
 }
 
 func (s *Service) Messages(convID, afterID int64) ([]storage.Message, error) {
+	s.mirrorTerminal(convID)
 	return s.Store.Messages(convID, afterID, 0)
+}
+
+// mirrorTerminal copies what was typed and answered in the conversation's
+// terminal (read from the agent's own session transcript) into the chat, so
+// the chat view and the terminal show one conversation and chat replies can
+// continue it. It is idempotent and silent on any problem.
+func (s *Service) mirrorTerminal(convID int64) {
+	conv, err := s.Store.Conversation(convID)
+	if err != nil || conv.SessionID == 0 || (conv.Agent != "claude" && conv.Agent != "") {
+		return
+	}
+	sess, err := s.Store.Session(conv.SessionID)
+	if err != nil || sess.Agent != "claude" || sess.ExternalID == "" {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	path := transcript.FindClaude(home, sess.ExternalID)
+	if path == "" {
+		return
+	}
+	s.tmu.Lock()
+	if s.mirrorBusy[convID] {
+		s.tmu.Unlock()
+		return
+	}
+	s.mirrorBusy[convID] = true
+	off := s.mirrorOff[convID]
+	s.tmu.Unlock()
+	defer func() { s.tmu.Lock(); delete(s.mirrorBusy, convID); s.tmu.Unlock() }()
+
+	entries, next, err := transcript.ReadClaude(path, off)
+	if err != nil {
+		return
+	}
+	sent, sentAt, _ := s.Store.SentTexts(convID, 50)
+	ctxPrompt, _, _ := strings.Cut(agents.ContextPrompt, "{contextFile}")
+	for _, e := range entries {
+		role, source := storage.RoleAssistant, storage.SourceTerminal
+		if e.Role == "user" {
+			role = storage.RoleUser
+			if strings.HasPrefix(e.Text, ctxPrompt) || strings.HasPrefix(e.Text, commands.Marker) || sentFromChat(e, sent, sentAt) {
+				continue // AICW's own opening prompt, or a message already shown from the composer
+			}
+		}
+		s.Store.AddMirrored(convID, role, source, e.Text, e.ID, e.At)
+	}
+	s.tmu.Lock()
+	s.mirrorOff[convID] = next
+	s.tmu.Unlock()
+}
+
+// sentFromChat reports whether a terminal user entry is the chat composer's
+// own message (typed into the terminal as a paste) rather than keyboard input.
+func sentFromChat(e transcript.Entry, bodies []string, times []time.Time) bool {
+	for i, b := range bodies {
+		b = strings.TrimSpace(b)
+		if b == "" || (e.Text != b && !strings.HasPrefix(e.Text, b+"\n[attached ")) {
+			continue
+		}
+		if d := e.At.Sub(times[i]); e.At.IsZero() || (d > -2*time.Minute && d < 2*time.Minute) {
+			return true
+		}
+	}
+	return false
 }
 
 type SendOptions struct {
@@ -110,6 +180,12 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 		s.Store.UpdateConversation(conv.ID, &t, nil, nil)
 	}
 	res := &SendResult{Message: msg}
+	// A fixed command (/grill-me, /write-pages, ...) is shown as typed but the
+	// agent receives its full instructions.
+	deliver := o.Text
+	if p, _, ok := commands.Expand(o.Text); ok {
+		deliver = p
+	}
 	if o.Mode == "save" || o.Mode == "" {
 		return res, nil
 	}
@@ -126,7 +202,7 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 	}
 	if tid == "" {
 		var b strings.Builder
-		b.WriteString(o.Text)
+		b.WriteString(deliver)
 		for _, m := range msg.Media {
 			fmt.Fprintf(&b, "\n[attached %s: %s]", m.Kind, m.Stored)
 		}
@@ -134,7 +210,7 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 		return res, nil
 	}
 	var b strings.Builder
-	b.WriteString(o.Text)
+	b.WriteString(deliver)
 	for _, m := range msg.Media {
 		fmt.Fprintf(&b, "\n[attached %s: %s]", m.Kind, m.Stored)
 	}
@@ -287,7 +363,7 @@ func (s *Service) TermStart(o TermStartOptions) (*TermInfo, error) {
 			info.Fallback = "Install it or set its path in Settings → AI agents. You can still open a plain shell terminal."
 			return info, nil
 		}
-		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path}
+		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path, Model: s.GetSettings().AgentModels[agent]}
 		if o.Mode == "resume" && conv.SessionID != 0 {
 			if sess, err = s.Store.Session(conv.SessionID); err == nil {
 				req.Mode, req.SessionID = agents.ModeResume, sess.ExternalID
@@ -666,7 +742,7 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 		sess, _ = s.Store.Session(conv.SessionID)
 	}
 	first := sess == nil
-	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits}
+	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits, Model: s.GetSettings().AgentModels[agent]}
 	if first {
 		req.NewID = newUUID()
 		if agent != "claude" { // others get the context package path; Claude gets rules + MCP tools instead
@@ -686,7 +762,9 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 			s.postSystem(convID, "Could not prepare the AICW tools: "+err.Error())
 			return
 		}
-		req.Extra = []string{"--mcp-config", cfg, "--append-system-prompt", rules.Prompt(s.skillsFor(w.ID))}
+		// Headless runs can't ask for permission, so AICW's own tools (notes,
+		// pages, skills) are pre-approved; file edits stay governed by the toggle.
+		req.Extra = []string{"--mcp-config", cfg, "--allowedTools", "mcp__aicw", "--append-system-prompt", rules.Prompt(s.skillsFor(w.ID))}
 	}
 	launch, err := agents.BuildChat(prof, req)
 	if err != nil {
@@ -820,3 +898,6 @@ func (s *Service) VoiceStopAttach(wsID int64) (*VoiceResult, error) {
 	res.Media = m
 	return res, nil
 }
+
+// SlashCommands lists the fixed composer commands for the "/" menu.
+func (s *Service) SlashCommands() []commands.Command { return commands.All() }

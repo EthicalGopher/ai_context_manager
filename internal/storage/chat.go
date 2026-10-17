@@ -14,6 +14,9 @@ const (
 	RoleSystem    = "system"
 	SourceUI      = "ui"
 	SourceAgent   = "agent"
+	// SourceTerminal marks messages mirrored from the agent's own session
+	// transcript (typed or answered in the embedded terminal).
+	SourceTerminal = "terminal"
 )
 
 type Conversation struct {
@@ -321,4 +324,40 @@ func (s *Store) PutSkill(wsID int64, name, desc, body string, alwaysOn bool, by 
 func (s *Store) DeleteSkill(wsID int64, name string) error {
 	_, err := s.db.Exec(`DELETE FROM skills WHERE workspace_id=? AND name=?`, wsID, name)
 	return err
+}
+
+// AddMirrored stores a message copied from an agent's session transcript.
+// extID makes it idempotent: the same transcript entry is never stored twice.
+func (s *Store) AddMirrored(convID int64, role, source, body, extID string, at time.Time) (bool, error) {
+	if at.IsZero() {
+		at = s.now()
+	}
+	res, err := s.db.Exec(`INSERT OR IGNORE INTO messages(conversation_id,role,source,body,created_at,ext_id) VALUES(?,?,?,?,?,?)`, convID, role, source, body, ts(at), extID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		s.db.Exec(`UPDATE conversations SET updated_at=? WHERE id=?`, ts(s.now()), convID)
+	}
+	return n > 0, nil
+}
+
+// SentTexts returns the bodies and times of the latest user messages that
+// were written in AICW itself (not mirrored), newest first.
+func (s *Store) SentTexts(convID int64, limit int) (bodies []string, times []time.Time, err error) {
+	rows, err := s.db.Query(`SELECT body,created_at FROM messages WHERE conversation_id=? AND role='user' AND ext_id='' ORDER BY id DESC LIMIT ?`, convID, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var b string
+		var ca int64
+		if err := rows.Scan(&b, &ca); err != nil {
+			return nil, nil, err
+		}
+		bodies, times = append(bodies, b), append(times, fromTS(ca))
+	}
+	return bodies, times, rows.Err()
 }

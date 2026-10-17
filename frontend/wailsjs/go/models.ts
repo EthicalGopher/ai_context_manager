@@ -98,6 +98,8 @@ export namespace agents {
 	    notes: string;
 	    envNames?: string[];
 	    extraArgs?: string[];
+	    modelArgs?: string[];
+	    modelHints?: string[];
 	    chat?: ChatSpec;
 	
 	    static createFrom(source: any = {}) {
@@ -125,6 +127,8 @@ export namespace agents {
 	        this.notes = source["notes"];
 	        this.envNames = source["envNames"];
 	        this.extraArgs = source["extraArgs"];
+	        this.modelArgs = source["modelArgs"];
+	        this.modelHints = source["modelHints"];
 	        this.chat = this.convertValues(source["chat"], ChatSpec);
 	    }
 	
@@ -166,6 +170,27 @@ export namespace agents {
 	        this.version = source["version"];
 	        this.detail = source["detail"];
 	        this.verified = source["verified"];
+	    }
+	}
+
+}
+
+export namespace commands {
+	
+	export class Command {
+	    name: string;
+	    description: string;
+	    usage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Command(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.usage = source["usage"];
 	    }
 	}
 
@@ -521,6 +546,7 @@ export namespace service {
 	    theme: string;
 	    terminal: string;
 	    agentPaths: Record<string, string>;
+	    agentModels: Record<string, string>;
 	    autoTerminal: boolean;
 	    chatEdits: boolean;
 	    voiceCommand: string;
@@ -545,6 +571,7 @@ export namespace service {
 	        this.theme = source["theme"];
 	        this.terminal = source["terminal"];
 	        this.agentPaths = source["agentPaths"];
+	        this.agentModels = source["agentModels"];
 	        this.autoTerminal = source["autoTerminal"];
 	        this.chatEdits = source["chatEdits"];
 	        this.voiceCommand = source["voiceCommand"];
