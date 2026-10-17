@@ -171,6 +171,27 @@ export namespace agents {
 
 }
 
+export namespace commands {
+	
+	export class Command {
+	    name: string;
+	    description: string;
+	    usage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Command(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.usage = source["usage"];
+	    }
+	}
+
+}
+
 export namespace contextbuilder {
 	
 	export class FileRef {

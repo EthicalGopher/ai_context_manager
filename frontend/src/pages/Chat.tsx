@@ -133,6 +133,9 @@ export default function Chat() {
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-2.5">
           <Title conv={conv} onRename={async (t) => { try { await api.RenameConversation(convId, t); refreshConvs() } catch (e) { setError(errMsg(e)) } }} />
           <div className="flex items-center gap-2">
+            <button disabled={busy || working || !convId || empty} onClick={() => send('/write-pages', []).catch((e) => setError(errMsg(e)))}
+              title="The agent writes everything from this conversation into project pages by itself (same as typing /write-pages)"
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-bold text-fg hover:bg-line/60 disabled:opacity-40">Write to pages</button>
             <label className="flex items-center gap-2 text-xs text-mute" title="When off, the agent answers and reads files but cannot change them in chat. The terminal always uses the agent's own permission prompts.">
               <input type="checkbox" checked={edits} onChange={async (e) => { setEdits(e.target.checked); try { await api.SetChatEdits(e.target.checked) } catch (x) { setError(errMsg(x)); setEdits(!e.target.checked) } }} /> Allow file edits
             </label>

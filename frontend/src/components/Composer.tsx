@@ -4,6 +4,7 @@ import { api, errMsg } from '../lib/api'
 import { OnFileDrop, OnFileDropOff } from '../../wailsjs/runtime/runtime'
 
 export interface Attached { id: number; name: string; kind: string }
+export interface SlashCommand { name: string; description: string; usage?: string }
 type Rec = 'idle' | 'recording' | 'transcribing'
 
 const toB64 = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.onerror = () => rej(r.error); r.readAsDataURL(f) })
@@ -21,6 +22,15 @@ export function Composer({ wsId, busy, placeholder, onSend, autoFocus, onVoiceHe
   const [kind, setKind] = useState<'dictate' | 'note'>('dictate')
   const [secs, setSecs] = useState(0)
   const ta = useRef<HTMLTextAreaElement>(null)
+  const [cmds, setCmds] = useState<SlashCommand[]>([])
+  const [sel, setSel] = useState(0)
+  const [menuOff, setMenuOff] = useState(false)
+  useEffect(() => { let live = true; Promise.resolve(api.SlashCommands?.()).then((c: any) => { if (live && Array.isArray(c)) setCmds(c) }).catch(() => {}); return () => { live = false } }, [])
+  // The "/" menu is open while the first word is a partial command name.
+  const typed = /^\/[\w-]*$/.test(text) ? text.slice(1).toLowerCase() : null
+  const matches = typed === null || menuOff ? [] : cmds.filter((c) => c.name.startsWith(typed))
+  useEffect(() => { setSel(0); setMenuOff(false) }, [typed])
+  const complete = (c: SlashCommand) => { setText('/' + c.name + ' '); setMenuOff(true); ta.current?.focus() }
 
   const grow = () => { const el = ta.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 220) + 'px' } }
   useEffect(grow, [text])
@@ -110,10 +120,29 @@ export function Composer({ wsId, busy, placeholder, onSend, autoFocus, onVoiceHe
                 <button aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((x) => x.id !== f.id))} className="absolute -right-1.5 -top-1.5 rounded-full bg-fg p-0.5 text-bg"><FiX aria-hidden size={12} /></button>
               </li>))}
           </ul>)}
+        {matches.length > 0 && (
+          <ul role="listbox" aria-label="Commands" className="mb-1 overflow-hidden rounded-2xl border border-line bg-bg">
+            {matches.map((c, i) => (
+              <li key={c.name} role="option" aria-selected={i === sel}>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); complete(c) }} onMouseEnter={() => setSel(i)}
+                  className={`flex w-full items-baseline gap-3 px-3 py-2 text-left text-sm ${i === sel ? 'bg-line/60' : ''}`}>
+                  <span className="font-mono font-bold">/{c.name}{c.usage ? <span className="font-normal text-mute"> {c.usage}</span> : null}</span>
+                  <span className="min-w-0 truncate text-xs text-mute">{c.description}</span>
+                </button>
+              </li>))}
+          </ul>)}
         <textarea ref={ta} value={text} rows={1} placeholder={rec === 'recording' ? `${kind === 'note' ? 'Recording a voice message' : 'Listening'}… ${secs}s (click the square to finish)` : rec === 'transcribing' ? 'Transcribing…' : placeholder ?? 'Message the agent…'}
           aria-label="Message" disabled={rec !== 'idle'}
           onChange={(e) => setText(e.target.value)} onPaste={onPaste}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } else if (e.key === 'Escape' && rec === 'recording') cancelRec() }}
+          onKeyDown={(e) => {
+            if (matches.length) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setSel((i) => (i + 1) % matches.length); return }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setSel((i) => (i + matches.length - 1) % matches.length); return }
+              if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && matches[sel].name !== typed)) { e.preventDefault(); complete(matches[sel]); return }
+              if (e.key === 'Escape') { e.preventDefault(); setMenuOff(true); return }
+            }
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } else if (e.key === 'Escape' && rec === 'recording') cancelRec()
+          }}
           className="block max-h-56 w-full resize-none border-0 bg-transparent px-3 py-2 text-[15px] text-fg shadow-none placeholder:text-mute" />
         <div className="flex items-center justify-between gap-2 px-1 pt-1">
           <div className="flex min-w-0 items-center gap-1">
@@ -132,7 +161,7 @@ export function Composer({ wsId, busy, placeholder, onSend, autoFocus, onVoiceHe
           </div>
         </div>
       </div>
-      <p className="mt-2 text-center text-xs text-mute">{hint ?? 'Enter to send · Shift+Enter for a new line · paste or drop images, video, audio'}</p>
+      <p className="mt-2 text-center text-xs text-mute">{hint ?? 'Enter to send · Shift+Enter for a new line · type / for commands · paste or drop images, video, audio'}</p>
     </div>
   )
 }

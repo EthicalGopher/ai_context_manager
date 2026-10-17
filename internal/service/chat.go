@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"aicw/internal/agents"
+	"aicw/internal/commands"
 	"aicw/internal/contextbuilder"
 	"aicw/internal/markdown"
 	"aicw/internal/media"
@@ -110,7 +111,7 @@ func (s *Service) mirrorTerminal(convID int64) {
 		role, source := storage.RoleAssistant, storage.SourceTerminal
 		if e.Role == "user" {
 			role = storage.RoleUser
-			if strings.HasPrefix(e.Text, ctxPrompt) || sentFromChat(e, sent, sentAt) {
+			if strings.HasPrefix(e.Text, ctxPrompt) || strings.HasPrefix(e.Text, commands.Marker) || sentFromChat(e, sent, sentAt) {
 				continue // AICW's own opening prompt, or a message already shown from the composer
 			}
 		}
@@ -179,6 +180,12 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 		s.Store.UpdateConversation(conv.ID, &t, nil, nil)
 	}
 	res := &SendResult{Message: msg}
+	// A fixed command (/grill-me, /write-pages, ...) is shown as typed but the
+	// agent receives its full instructions.
+	deliver := o.Text
+	if p, _, ok := commands.Expand(o.Text); ok {
+		deliver = p
+	}
 	if o.Mode == "save" || o.Mode == "" {
 		return res, nil
 	}
@@ -195,7 +202,7 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 	}
 	if tid == "" {
 		var b strings.Builder
-		b.WriteString(o.Text)
+		b.WriteString(deliver)
 		for _, m := range msg.Media {
 			fmt.Fprintf(&b, "\n[attached %s: %s]", m.Kind, m.Stored)
 		}
@@ -203,7 +210,7 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 		return res, nil
 	}
 	var b strings.Builder
-	b.WriteString(o.Text)
+	b.WriteString(deliver)
 	for _, m := range msg.Media {
 		fmt.Fprintf(&b, "\n[attached %s: %s]", m.Kind, m.Stored)
 	}
@@ -755,7 +762,9 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 			s.postSystem(convID, "Could not prepare the AICW tools: "+err.Error())
 			return
 		}
-		req.Extra = []string{"--mcp-config", cfg, "--append-system-prompt", rules.Prompt(s.skillsFor(w.ID))}
+		// Headless runs can't ask for permission, so AICW's own tools (notes,
+		// pages, skills) are pre-approved; file edits stay governed by the toggle.
+		req.Extra = []string{"--mcp-config", cfg, "--allowedTools", "mcp__aicw", "--append-system-prompt", rules.Prompt(s.skillsFor(w.ID))}
 	}
 	launch, err := agents.BuildChat(prof, req)
 	if err != nil {
@@ -889,3 +898,6 @@ func (s *Service) VoiceStopAttach(wsID int64) (*VoiceResult, error) {
 	res.Media = m
 	return res, nil
 }
+
+// SlashCommands lists the fixed composer commands for the "/" menu.
+func (s *Service) SlashCommands() []commands.Command { return commands.All() }
