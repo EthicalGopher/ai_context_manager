@@ -431,7 +431,8 @@ func listMedia(e Env, _ json.RawMessage) (any, error) {
 	return out, nil
 }
 
-var localImg = regexp.MustCompile(`!\[([^\]]*)\]\((/[^)\s]+)\)`)
+// Absolute paths: /unix/style or C:\windows\style (either slash after the drive).
+var localImg = regexp.MustCompile(`!\[([^\]]*)\]\((/[^)\s]+|[A-Za-z]:[\\/][^)\s]+)\)`)
 
 // storeLocalMedia turns ![cap](/abs/path) references into stored media refs.
 func storeLocalMedia(e Env, md string) (string, []string) {

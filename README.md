@@ -1,6 +1,8 @@
-# AI Context Workspace (`aicw`)
+<p align="center"><img src="docs/assets/logo.png" alt="AI Context Workspace logo" width="128"></p>
 
-**Fresh sessions. Smarter context. Better coding.**
+<h1 align="center">AI Context Workspace (<code>aicw</code>)</h1>
+
+<p align="center"><b>Fresh sessions. Smarter context. Better coding.</b></p>
 
 A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, Gemini, …) from a ChatGPT-style window, with a real terminal inside it, rich saved *pages*, always-on skills and memory the AI must read and keep updated, and tools that let the AI add data by itself. Built with Go, Wails, React, TypeScript, Tailwind and SQLite. Linux first.
 
@@ -13,6 +15,7 @@ A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, 
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Download and install](#download-and-install)
+  - [Windows](#windows-experimental)
 - [Using it](#using-it)
 - [Where your data lives](#where-your-data-lives)
 - [Status: what is and isn't verified](#status-what-is-and-isnt-verified)
@@ -41,7 +44,9 @@ A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, 
 
 ## Download and install
 
-Linux (x86-64) is the supported platform today. Windows is **experimental** (it cross-compiles and vets cleanly but has not been run on a real Windows machine; build with `scripts\build.ps1`). macOS is **not built or tested**.
+Linux (x86-64) is the supported platform today. Windows is **experimental**: see [Windows](#windows-experimental) below. macOS is **not built or tested**.
+
+The Linux steps follow; **Windows users can jump to [Windows](#windows-experimental).**
 
 ### 1. Install the system libraries
 
@@ -75,7 +80,45 @@ cd aicw-0.2.0-linux-amd64 && ./install.sh
 
 The repository also contains a GitHub Actions workflow (`.github/workflows/release.yml`) that builds and attaches this tarball when a `v*` tag is pushed. **It has never been run**, and no release has been published yet, so there is no prebuilt download to link to.
 
-### Installer details
+### Windows (experimental)
+
+Windows 10 version 1809 or newer, x86-64. It cross-compiles and passes `go vet`, but it has **not been run on a real Windows machine yet**, so expect rough edges and please report them.
+
+**1. Install the prerequisites** (for example with `winget`):
+
+```powershell
+winget install GoLang.Go OpenJS.NodeJS.LTS Git.Git
+```
+
+- **Go ≥ 1.26** and **Node ≥ 20** are needed to build; `git` is used at run time for Git status.
+- **WebView2 runtime**: already on Windows 11 and current Windows 10. Otherwise install it from Microsoft ("Evergreen Bootstrapper").
+- Your AI CLI (`claude`, `kilo`, `agy`, …) installed and signed in separately. npm-installed CLIs (`.cmd` shims) work in the embedded terminal.
+- Optional, for voice recording: **ffmpeg** on `PATH`. If the wrong microphone is picked, set `AICW_AUDIO_DEVICE` to its DirectShow name.
+
+**2. Build and install** (PowerShell):
+
+```powershell
+git clone https://github.com/EthicalGopher/ai_context_manager.git
+cd ai_context_manager
+scripts\build.ps1 0.2.0                       # builds the frontend and build\bin\aicw.exe
+
+# put aicw.exe somewhere on your PATH (per-user, no admin needed)
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\aicw" | Out-Null
+Copy-Item build\bin\aicw.exe "$env:LOCALAPPDATA\Programs\aicw\"
+[Environment]::SetEnvironmentVariable("Path", "$env:Path;$env:LOCALAPPDATA\Programs\aicw", "User")
+```
+
+Open a **new** terminal, then run `aicw doctor` to check PATH, data folder, database and agent CLIs, and `aicw .` to open a project.
+
+| | |
+| --- | --- |
+| Data folder | `%LOCALAPPDATA%\aicw` (override with `AICW_DATA_DIR`) |
+| Terminal launch | Windows Terminal (`wt`) if installed, otherwise `cmd` |
+| Upgrade | Rebuild and copy over `aicw.exe` (close the app first). Your data is kept |
+| Uninstall | Delete `%LOCALAPPDATA%\Programs\aicw`, remove it from `Path`, and delete `%LOCALAPPDATA%\aicw` to remove your data |
+| Not available | A prebuilt installer; there is no signed `.exe`/`.msi` yet, and Windows SmartScreen may warn about a locally built binary |
+
+### Installer details (Linux)
 
 | | |
 | --- | --- |

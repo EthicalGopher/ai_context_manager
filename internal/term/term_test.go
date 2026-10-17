@@ -3,6 +3,7 @@ package term
 import (
 	"bytes"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -35,6 +36,9 @@ func waitFor(t *testing.T, mu *sync.Mutex, b *bytes.Buffer, want string) {
 }
 
 func TestInteractiveEchoAndExitCode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses /bin/sh; see TestWindowsConPTY")
+	}
 	m := NewManager()
 	b, mu, exit := collect(m)
 	s, err := m.Start(Spec{Exe: "/bin/sh", Args: []string{"-c", `read x; echo got:$x; exit 3`}, Dir: t.TempDir(), Env: os.Environ()})
@@ -65,6 +69,9 @@ func TestInteractiveEchoAndExitCode(t *testing.T) {
 }
 
 func TestArgvNoShellInterpolationAndEnv(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses /bin/sh; see TestWindowsConPTY")
+	}
 	m := NewManager()
 	b, mu, _ := collect(m)
 	dir := t.TempDir()
