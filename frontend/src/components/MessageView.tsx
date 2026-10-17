@@ -22,7 +22,7 @@ export function MessageView({ m, onSave }: { m: Msg; onSave?: (m: Msg) => void }
   return (
     <article className={`group flex ${mine ? 'justify-end' : 'justify-start'}`} aria-label={mine ? 'You' : m.source === 'agent' ? 'Agent' : 'Assistant'}>
       <div className={`max-w-[85%] space-y-2 ${mine ? 'rounded-3xl bg-raised px-4 py-2.5' : 'px-1'}`}>
-        {!mine && <div className="text-xs font-bold text-mute">{m.source === 'agent' ? 'Agent (via AICW tools)' : 'Assistant'}</div>}
+        {!mine && <div className="text-xs font-bold text-mute">{m.source === 'agent' ? 'Agent (via AICW tools)' : m.source === 'terminal' ? 'Agent (terminal)' : 'Assistant'}</div>}
         {m.media.length > 0 && <div className="flex flex-wrap gap-2">{m.media.map((x) => <Attachment key={x.id} m={x} />)}</div>}
         {m.body.trim() && (mine ? <p className="whitespace-pre-wrap break-words">{m.body}</p> : <Markdown text={m.body} />)}
         {onSave && <button onClick={() => onSave(m)} className="flex items-center gap-1 text-xs font-bold text-mute opacity-0 transition-opacity hover:text-fg focus:opacity-100 group-hover:opacity-100"><FiBookmark aria-hidden /> Save to page</button>}

@@ -24,8 +24,8 @@ func TestNoBackupWhenAlreadyCurrentAndBackupIsPrivate(t *testing.T) {
 	var v int
 	db.QueryRow("PRAGMA user_version").Scan(&v)
 	db.Close()
-	if v != 4 {
-		t.Fatalf("user_version = %d, want 4", v)
+	if v != 5 {
+		t.Fatalf("user_version = %d, want 5", v)
 	}
 	if err := copyFile(path, path+".bak-v1"); err != nil {
 		t.Fatal(err)

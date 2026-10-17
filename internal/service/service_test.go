@@ -752,3 +752,96 @@ func TestSendModesAndVoiceMessageAndAddToPage(t *testing.T) {
 		t.Fatalf("each add keeps a version: %d", len(v))
 	}
 }
+
+func TestTerminalConversationIsMirroredIntoChat(t *testing.T) {
+	s := newSvc(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	r, _ := s.OpenWorkspace(project(t), false)
+	conv, _ := s.NewConversation(r.Workspace.ID, "", "claude")
+	sess, _ := s.WS.StartSession(r.Workspace.ID, "claude", "task")
+	ext := "11111111-2222-3333-4444-555555555555"
+	s.Store.UpdateSession(sess.ID, storage.SessionPatch{ExternalID: &ext})
+	s.Store.UpdateConversation(conv.ID, nil, nil, &sess.ID)
+
+	// A message sent from the chat composer is typed into the terminal and so
+	// also lands in the transcript; it must not be shown twice.
+	s.SendMessage(SendOptions{ConversationID: conv.ID, Text: "from the composer", Mode: "save"})
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	file := filepath.Join(home, ".claude", "projects", "-proj", ext+".jsonl")
+	os.MkdirAll(filepath.Dir(file), 0o755)
+	write := func(lines ...string) {
+		f, _ := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		defer f.Close()
+		for _, l := range lines {
+			f.WriteString(l + "\n")
+		}
+	}
+	write(
+		`{"type":"user","uuid":"u1","entrypoint":"cli","timestamp":"`+now+`","message":{"content":"Read the project context package at /x/context.md before doing anything else. Then wait."}}`,
+		`{"type":"user","uuid":"u2","entrypoint":"cli","timestamp":"`+now+`","message":{"content":"from the composer"}}`,
+		`{"type":"user","uuid":"u3","entrypoint":"cli","timestamp":"`+now+`","message":{"content":"typed in the terminal"}}`,
+		`{"type":"assistant","uuid":"a1","entrypoint":"cli","timestamp":"`+now+`","message":{"content":[{"type":"text","text":"terminal answer"}]}}`,
+	)
+	bodies := func() []string {
+		ms, _ := s.Messages(conv.ID, 0)
+		var out []string
+		for _, m := range ms {
+			out = append(out, m.Role+":"+m.Body)
+		}
+		return out
+	}
+	want := "user:from the composer|user:typed in the terminal|assistant:terminal answer"
+	if got := strings.Join(bodies(), "|"); got != want {
+		t.Fatalf("got %q", got)
+	}
+	// Idempotent, and later lines are picked up.
+	write(`{"type":"assistant","uuid":"a2","entrypoint":"cli","timestamp":"` + now + `","message":{"content":[{"type":"text","text":"more"}]}}`)
+	s.mirrorOff[conv.ID] = 0 // as after an app restart: re-reading must not duplicate
+	if got := strings.Join(bodies(), "|"); got != want+"|assistant:more" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestSlashCommandShownAsTypedButAgentGetsFullPrompt(t *testing.T) {
+	s := newSvc(t)
+	fakeChatAgent(t, s, `last=""; for a in "$@"; do last="$a"; done; echo "got: $last"`)
+	r, _ := s.OpenWorkspace(project(t), false)
+	conv, _ := s.NewConversation(r.Workspace.ID, "", "fakeai")
+	if _, err := s.SendMessage(SendOptions{ConversationID: conv.ID, Text: "/grill-me the login page", Mode: "chat"}); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, s, conv.ID)
+	msgs, _ := s.Messages(conv.ID, 0)
+	if len(msgs) < 2 || msgs[0].Body != "/grill-me the login page" {
+		t.Fatalf("the typed command must be what the chat shows: %+v", msgs)
+	}
+	if !strings.Contains(msgs[1].Body, "Ask your first question now.") {
+		t.Fatalf("the agent must receive the expanded instructions: %q", msgs[1].Body)
+	}
+	if len(s.SlashCommands()) < 3 {
+		t.Fatal("commands should be listed")
+	}
+}
+
+func TestAgentModelSettingValidatedAndUsed(t *testing.T) {
+	s := newSvc(t)
+	fakeChatAgent(t, s, `echo "args: $*"`)
+	st := s.GetSettings()
+	st.AgentModels = map[string]string{"claude": "--bad"}
+	if err := s.SaveSettings(st); err == nil {
+		t.Fatal("a model that looks like an option must be refused")
+	}
+	st.AgentModels = map[string]string{"nope": "x"}
+	if err := s.SaveSettings(st); err == nil {
+		t.Fatal("unknown agent must be refused")
+	}
+	st.AgentModels = map[string]string{"claude": " opus ", "kilo": ""}
+	if err := s.SaveSettings(st); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.GetSettings().AgentModels; got["claude"] != "opus" || len(got) != 1 {
+		t.Fatalf("%v", got)
+	}
+}

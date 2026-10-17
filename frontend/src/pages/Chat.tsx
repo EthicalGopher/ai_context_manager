@@ -5,6 +5,7 @@ import { api, errMsg } from '../lib/api'
 import { useStore, type Conv } from '../store'
 import { useWorkspace } from '../lib/hooks'
 import { Composer, type Attached } from '../components/Composer'
+import { ModelPicker } from '../components/ModelPicker'
 import { MessageView, type Msg } from '../components/MessageView'
 import { TerminalPane } from '../components/TerminalPane'
 import { Button, Confirm, ErrorBox } from '../components/ui'
@@ -133,6 +134,9 @@ export default function Chat() {
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-2.5">
           <Title conv={conv} onRename={async (t) => { try { await api.RenameConversation(convId, t); refreshConvs() } catch (e) { setError(errMsg(e)) } }} />
           <div className="flex items-center gap-2">
+            <button disabled={busy || working || !convId || empty} onClick={() => send('/write-pages', []).catch((e) => setError(errMsg(e)))}
+              title="The agent writes everything from this conversation into project pages by itself (same as typing /write-pages)"
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-bold text-fg hover:bg-line/60 disabled:opacity-40">Write to pages</button>
             <label className="flex items-center gap-2 text-xs text-mute" title="When off, the agent answers and reads files but cannot change them in chat. The terminal always uses the agent's own permission prompts.">
               <input type="checkbox" checked={edits} onChange={async (e) => { setEdits(e.target.checked); try { await api.SetChatEdits(e.target.checked) } catch (x) { setError(errMsg(x)); setEdits(!e.target.checked) } }} /> Allow file edits
             </label>
@@ -140,6 +144,7 @@ export default function Chat() {
               <select aria-label="Agent for this chat" value={conv.agent || 'claude'} onChange={async (e) => { try { await api.SetConversationAgent(conv.id, e.target.value); refreshConvs() } catch (x) { setError(errMsg(x)) } }} className="rounded-lg border border-line bg-bg px-2 py-1 text-xs">
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}<option value="shell">Plain shell</option>
               </select>)}
+            {conv && <ModelPicker agent={conv.agent || 'claude'} onError={setError} />}
             <Button variant={termOpen ? 'primary' : 'secondary'} onClick={toggleTerm} aria-pressed={termOpen}>
               <FiTerminal aria-hidden /> Terminal {running && <span className="h-2 w-2 rounded-full bg-ok" aria-label="running" />}
             </Button>

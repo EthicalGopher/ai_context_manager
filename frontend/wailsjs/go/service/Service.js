@@ -366,6 +366,10 @@ export function VoiceCancel() {
   return window['go']['service']['Service']['VoiceCancel']();
 }
 
+export function SlashCommands() {
+  return window['go']['service']['Service']['SlashCommands']();
+}
+
 export function VoiceSetup(arg1) {
   return window['go']['service']['Service']['VoiceSetup'](arg1);
 }
