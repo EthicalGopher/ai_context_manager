@@ -32,6 +32,7 @@ export const apiMock = {
   NewConversation: vi.fn(),
   SendMessage: vi.fn(),
   SlashCommands: vi.fn(),
+  SaveSettings: vi.fn(),
   Messages: vi.fn(),
   TermStatus: vi.fn(),
   RenameConversation: vi.fn(),
