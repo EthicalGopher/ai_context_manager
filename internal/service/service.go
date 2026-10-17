@@ -662,7 +662,12 @@ func (s *Service) Launch(o LaunchOptions) (*LaunchResult, error) {
 	st := s.Reg.Detect(context.Background(), o.Agent)
 	res.Disclosure = fmt.Sprintf("Launching %s will let it read and edit files and run commands in %s (per its own permission settings). The context package and anything the agent reads is sent to that tool's provider.", prof.DisplayName, w.Path)
 
-	req := agents.LaunchRequest{Mode: mode, Cwd: w.Path, Exe: st.Path, Model: s.GetSettings().AgentModels[o.Agent]}
+	model, modelEnv := resolveModel(s.GetSettings().AgentModels[o.Agent])
+	if len(modelEnv) > 0 {
+		res.Error = "A local model runs in the in-app Terminal panel or in chat replies, not in an external terminal. Use the Terminal panel, or pick a hosted model."
+		return res, nil
+	}
+	req := agents.LaunchRequest{Mode: mode, Cwd: w.Path, Exe: st.Path, Model: model}
 	if mode == agents.ModeResume {
 		req.SessionID = sess.ExternalID
 	} else {

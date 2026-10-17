@@ -845,3 +845,28 @@ func TestAgentModelSettingValidatedAndUsed(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+func TestLocalModelPointsTheAgentAtTheLocalServer(t *testing.T) {
+	s := newSvc(t)
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "fakelocal"), []byte("#!/bin/sh\necho \"url=$ANTHROPIC_BASE_URL key=[$ANTHROPIC_API_KEY] args=$*\"\n"), 0o755)
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if err := s.AddCustomAgent(`{"id":"fakelocal","displayName":"Fake Local","executables":["fakelocal"],"handoff":"none","capabilities":{"newSession":true},
+		"modelArgs":["--model","{model}"],"chat":{"newArgs":["--print","{prompt}"],"continueArgs":["--continue","--print","{prompt}"]}}`); err != nil {
+		t.Fatal(err)
+	}
+	st := s.GetSettings()
+	st.AgentModels = map[string]string{"fakelocal": "ollama:llama3.2:latest"}
+	if err := s.SaveSettings(st); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := s.OpenWorkspace(project(t), false)
+	conv, _ := s.NewConversation(r.Workspace.ID, "", "fakelocal")
+	s.SendMessage(SendOptions{ConversationID: conv.ID, Text: "hi", Mode: "chat"})
+	waitIdle(t, s, conv.ID)
+	msgs, _ := s.Messages(conv.ID, 0)
+	got := msgs[len(msgs)-1].Body
+	if !strings.Contains(got, "url=http://localhost:11434") || !strings.Contains(got, "key=[]") || !strings.Contains(got, "--model llama3.2:latest") || strings.Contains(got, "ollama:") {
+		t.Fatalf("local model must set the server and pass the bare name: %q", got)
+	}
+}

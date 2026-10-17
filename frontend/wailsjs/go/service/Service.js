@@ -366,6 +366,10 @@ export function VoiceCancel() {
   return window['go']['service']['Service']['VoiceCancel']();
 }
 
+export function ListModels(arg1, arg2) {
+  return window['go']['service']['Service']['ListModels'](arg1, arg2);
+}
+
 export function SlashCommands() {
   return window['go']['service']['Service']['SlashCommands']();
 }
