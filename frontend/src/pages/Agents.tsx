@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, errMsg } from '../lib/api'
 import { useAsync, useWorkspace } from '../lib/hooks'
 import { Badge, Button, Card, ErrorBox, PageHeader, Spinner, statusTone } from '../components/ui'
+import { ModelPicker } from '../components/ModelPicker'
 import { LaunchDialog } from '../components/LaunchDialog'
 
 const SAMPLE = `{
@@ -42,6 +43,7 @@ export default function Agents() {
                 <dt className="text-mute">Access</dt><dd className="text-warn">Can read/edit files and run commands in the workspace; sends context to its provider.</dd>
               </dl>
               {p.notes && <p className="mt-2 text-xs text-mute">{p.notes}</p>}
+              {p.modelArgs?.length > 0 && <div className="mt-3 flex items-center gap-2 text-sm"><span className="w-28 shrink-0 text-mute">Model</span><ModelPicker agent={p.id} className="flex-1 !w-auto" onError={setError} /></div>}
               <div className="mt-3 flex gap-2">
                 <label className="sr-only" htmlFor={`path-${p.id}`}>Executable path for {p.displayName}</label>
                 <input id={`path-${p.id}`} placeholder="Override executable path" value={paths[p.id] ?? ''} onChange={(e) => setPaths({ ...paths, [p.id]: e.target.value })} className="flex-1 rounded-md border border-line bg-bg px-2 py-1 text-sm" />

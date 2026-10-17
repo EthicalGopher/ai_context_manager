@@ -70,7 +70,9 @@ type Profile struct {
 	Notes           string       `json:"notes"`
 	EnvNames        []string     `json:"envNames,omitempty"` // names only; values are never stored
 	ExtraArgs       []string     `json:"extraArgs,omitempty"`
-	Chat            *ChatSpec    `json:"chat,omitempty"` // non-interactive "one message in, one reply out" mode
+	ModelArgs       []string     `json:"modelArgs,omitempty"`  // appended when a model is chosen; needs {model}
+	ModelHints      []string     `json:"modelHints,omitempty"` // example model names for the UI
+	Chat            *ChatSpec    `json:"chat,omitempty"`       // non-interactive "one message in, one reply out" mode
 }
 
 // ChatSpec describes how to run one chat turn without a terminal UI. Arg
@@ -89,7 +91,7 @@ type ChatSpec struct {
 
 var idRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,39}$`)
 var placeholderRe = regexp.MustCompile(`\{[a-zA-Z]+\}`)
-var knownPlaceholders = map[string]bool{"{prompt}": true, "{session}": true, "{cwd}": true, "{contextFile}": true}
+var knownPlaceholders = map[string]bool{"{prompt}": true, "{session}": true, "{cwd}": true, "{contextFile}": true, "{model}": true}
 var envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 
 // Validate checks a profile (typically user-supplied or imported).
@@ -113,7 +115,7 @@ func (p Profile) Validate() error {
 	default:
 		return fmt.Errorf("invalid handoff %q", p.Handoff)
 	}
-	for _, list := range [][]string{p.NewArgs, p.PromptArgs, p.ResumeArgs, p.ContinueArgs, p.SessionIDArgs, p.ExtraArgs, p.VersionArgs} {
+	for _, list := range [][]string{p.NewArgs, p.PromptArgs, p.ResumeArgs, p.ContinueArgs, p.SessionIDArgs, p.ExtraArgs, p.ModelArgs, p.VersionArgs} {
 		for _, a := range list {
 			if strings.ContainsRune(a, 0) {
 				return errors.New("argument contains NUL")
@@ -292,6 +294,7 @@ type LaunchRequest struct {
 	Prompt      string
 	Exe         string   // resolved executable path
 	Extra       []string // extra arguments placed before the prompt (already final, never templated)
+	Model       string   // optional model name for CLIs with ModelArgs
 }
 
 // LaunchSpec is a fully built, shell-free command.
@@ -321,6 +324,7 @@ func BuildLaunch(p Profile, req LaunchRequest) (*LaunchSpec, error) {
 			a = strings.ReplaceAll(a, "{session}", req.SessionID)
 			a = strings.ReplaceAll(a, "{cwd}", req.Cwd)
 			a = strings.ReplaceAll(a, "{contextFile}", req.ContextFile)
+			a = strings.ReplaceAll(a, "{model}", req.Model)
 			out = append(out, a)
 		}
 		return out
@@ -358,6 +362,15 @@ func BuildLaunch(p Profile, req LaunchRequest) (*LaunchSpec, error) {
 	default:
 		return nil, fmt.Errorf("unknown launch mode %q", req.Mode)
 	}
+	if req.Model != "" {
+		if err := ValidModel(req.Model); err != nil {
+			return nil, err
+		}
+		if len(p.ModelArgs) == 0 {
+			return nil, fmt.Errorf("%s has no known model option; clear the model for this agent", p.DisplayName)
+		}
+		args = append(args, sub(p.ModelArgs)...)
+	}
 	args = append(args, req.Extra...)
 	switch {
 	case req.ContextFile == "" && req.Prompt == "":
@@ -394,6 +407,7 @@ type ChatRequest struct {
 	SessionID string // existing CLI session to continue ("" = first turn)
 	NewID     string // ID to assign on a first turn when the CLI allows it
 	Edits     bool
+	Model     string   // optional model name for CLIs with ModelArgs
 	Extra     []string // final arguments placed before the prompt
 	FirstTurn bool
 }
@@ -449,10 +463,34 @@ func BuildChat(p Profile, r ChatRequest) (*ChatLaunch, error) {
 	if r.Edits {
 		args = append(args, c.EditArgs...)
 	}
+	if r.Model != "" {
+		if err := ValidModel(r.Model); err != nil {
+			return nil, err
+		}
+		if len(p.ModelArgs) == 0 {
+			return nil, fmt.Errorf("%s has no known model option; clear the model for this agent", p.DisplayName)
+		}
+		for _, a := range p.ModelArgs {
+			args = append(args, strings.ReplaceAll(a, "{model}", r.Model))
+		}
+	}
 	args = append(args, r.Extra...)
 	out.Args = args
 	if c.PromptVia == "stdin" {
 		out.Stdin = r.Prompt
 	}
 	return out, nil
+}
+
+var modelRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@\[\]+-]{0,99}$`)
+
+// ValidModel accepts model names and aliases such as "opus", "opus[1m]",
+// "gpt-5", "ollama/qwen2.5-coder:7b" or "lmstudio/llama-3.1-8b". It refuses
+// anything that could be read as an option (a leading dash) or contains
+// spaces or control characters.
+func ValidModel(m string) error {
+	if !modelRe.MatchString(m) {
+		return fmt.Errorf("invalid model name %q (letters, digits and . _ : / @ [ ] + - only, no spaces)", m)
+	}
+	return nil
 }

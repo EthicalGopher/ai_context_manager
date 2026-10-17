@@ -174,3 +174,30 @@ func TestBuildChatUnsupportedAndCustomValidation(t *testing.T) {
 		t.Fatal("bad promptVia accepted")
 	}
 }
+
+func TestModelOptionIsPassedAndValidated(t *testing.T) {
+	r := NewRegistry()
+	p, _ := r.Get("claude")
+	l, err := BuildChat(p, ChatRequest{Cwd: "/p", Exe: "c", Prompt: "hi", FirstTurn: true, NewID: "id", Model: "opus[1m]"})
+	if err != nil || !reflect.DeepEqual(l.Args[len(l.Args)-2:], []string{"--model", "opus[1m]"}) {
+		t.Fatalf("%v %q", err, l.Args)
+	}
+	spec, err := BuildLaunch(p, LaunchRequest{Mode: ModeNew, Cwd: "/p", Exe: "c", SessionID: "s", Model: "sonnet"})
+	if err != nil || !strings.Contains(strings.Join(spec.Args, " "), "--model sonnet") {
+		t.Fatalf("%v %q", err, spec.Args)
+	}
+	k, _ := r.Get("kilo")
+	l, _ = BuildChat(k, ChatRequest{Cwd: "/p", Exe: "k", Prompt: "hi", FirstTurn: true, Model: "ollama/qwen2.5-coder:7b"})
+	if !strings.Contains(strings.Join(l.Args, " "), "--model ollama/qwen2.5-coder:7b") {
+		t.Fatalf("%q", l.Args)
+	}
+	for _, bad := range []string{"--evil", "a b", "x;y", "-m"} {
+		if _, err := BuildChat(p, ChatRequest{Cwd: "/p", Exe: "c", Prompt: "hi", FirstTurn: true, Model: bad}); err == nil {
+			t.Fatalf("%q must be refused", bad)
+		}
+	}
+	f, _ := r.Get("freebuff")
+	if _, err := BuildLaunch(f, LaunchRequest{Mode: ModeNew, Cwd: "/p", Exe: "f", Model: "x"}); err == nil {
+		t.Fatal("an agent without a model option must say so")
+	}
+}
