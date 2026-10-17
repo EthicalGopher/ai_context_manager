@@ -970,7 +970,17 @@ func (s *Service) ListModels(agent string, refresh bool) models.Result {
 	res := models.Discover(context.Background(), agent, exe)
 	if agent == "claude" {
 		n := 0
-		for _, l := range s.LLM.Status().Models {
+		st := s.LLM.Status()
+		have := map[string]bool{}
+		for _, l := range st.Models {
+			have[l.File] = true
+		}
+		for _, c := range st.Catalog {
+			if !have[c.File] {
+				res.Models = append(res.Models, models.Model{ID: "aicw-get:" + c.ID, Label: c.Name + " — not downloaded yet", Group: "Local · get in Settings → Local models"})
+			}
+		}
+		for _, l := range st.Models {
 			if agents.ValidModel(localPrefix+l.File) == nil {
 				res.Models = append(res.Models, models.Model{ID: localPrefix + l.File, Label: l.Name, Group: "Local · downloaded by AICW"})
 				n++
@@ -979,6 +989,9 @@ func (s *Service) ListModels(agent string, refresh bool) models.Result {
 		if n == 0 {
 			res.Notes = append(res.Notes, "No local model yet. Settings → Local models downloads one (no Ollama or other tool needed).")
 		}
+	}
+	if agent != "claude" {
+		res.Notes = append(res.Notes, "Local models run through Claude Code only. Switch the agent to Claude Code to pick one.")
 	}
 	if res.Models == nil {
 		res.Models = []models.Model{}
