@@ -33,3 +33,10 @@ build with `wails build`.
 - `info.json` - Application details used for Windows builds. The data here will be used by the Windows installer,
   as well as the application itself (right click the exe -> properties -> details)
 - `wails.exe.manifest` - The main application manifest file.
+## Windows icon and manifest
+
+`rsrc_windows_amd64.syso` (repo root) embeds `build/windows/icon.ico` and `build/windows/aicw.manifest` into `aicw.exe`; `go build` links it automatically on Windows. Regenerate it after changing either file:
+
+```bash
+go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest build/windows/aicw.manifest -ico build/windows/icon.ico -o rsrc_windows_amd64.syso
+```
