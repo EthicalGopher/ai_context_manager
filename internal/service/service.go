@@ -92,6 +92,8 @@ type Service struct {
 	// chat turns (guarded by tmu)
 	chatCancel map[int64]context.CancelFunc
 	chatQueue  map[int64][]string
+	mirrorOff  map[int64]int64 // conversation -> bytes of its session transcript already mirrored
+	mirrorBusy map[int64]bool
 }
 
 func New(dataDir, version string) (*Service, error) {
@@ -100,7 +102,7 @@ func New(dataDir, version string) (*Service, error) {
 		return nil, err
 	}
 	s := &Service{Store: st, WS: &workspace.Manager{Store: st}, Reg: agents.NewRegistry(), DataDir: dataDir, Version: version,
-		term: term.NewManager(), rec: &voice.Recorder{}, convTerm: map[int64]string{}, termConv: map[string]int64{}, termSession: map[string]int64{}, chatCancel: map[int64]context.CancelFunc{}, chatQueue: map[int64][]string{}}
+		term: term.NewManager(), rec: &voice.Recorder{}, convTerm: map[int64]string{}, termConv: map[string]int64{}, termSession: map[string]int64{}, chatCancel: map[int64]context.CancelFunc{}, chatQueue: map[int64][]string{}, mirrorOff: map[int64]int64{}, mirrorBusy: map[int64]bool{}}
 	s.term.OnData = func(id string, d []byte) {
 		s.emit("term:data", map[string]string{"id": id, "data": base64.StdEncoding.EncodeToString(d)})
 	}

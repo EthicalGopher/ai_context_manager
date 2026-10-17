@@ -34,3 +34,5 @@ First working version (Linux).
 - Media: import images, video, audio, PDFs and other files (dialog or drag-and-drop) as private copies (originals untouched, 2 GB per file, secret-looking files refused); gallery with filters, in-app image/video/audio preview with seeking, notes, optional inclusion of paths and notes in the context package, confirmed delete.
 - `aicw --page <name>` opens a specific page; Favourites (pinned workspaces) and per-workspace session counts in the sidebar.
 - Database schema v2 (media table) with automatic pre-migration backup.
+- Terminal and chat share one conversation: what you type and what the agent answers in the embedded terminal is mirrored into the chat view (read from Claude Code's own session file), so you can carry on in the chat GUI afterwards. Other agents don't keep a readable transcript, so mirroring is Claude Code only. Database schema 5 adds `messages.ext_id` (backup is made first).
+- Windows (experimental): ConPTY terminal, Windows Terminal/cmd launch, `scripts/build.ps1`, embedded icon.

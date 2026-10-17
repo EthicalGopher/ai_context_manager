@@ -25,7 +25,7 @@ A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, 
 ## Features
 
 - **Chat with your AI CLI.** Conversations per project. The composer takes text, images, audio, video and PDFs (attach, drop or paste). Each message goes either to the agent running in the **terminal** or to a background **chat reply** that is posted back as a message (with Stop; file edits are off unless you allow them).
-- **Embedded terminal.** A real PTY (xterm.js) in each chat. It opens directly and starts the chat's agent, resuming its session if there is one.
+- **Embedded terminal.** A real PTY (xterm.js) in each chat. It opens directly and starts the chat's agent, resuming its session if there is one.  With Claude Code, what is said in the terminal also appears in the chat view, so you can continue in either.
 - **Pages.** Everything worth keeping becomes a rich project page: headline, text, images, video, audio. Add data to a page straight from its composer, or use *Save to page* on any chat message. Versions are kept.
 - **Skills & memory.** Write always-on skills (rules the AI must follow) and living notes it reads first and keeps current. One click installs them into `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` inside a marked block (diff, confirmation, backup).
 - **AI tools.** The AI can create conversations, post messages with attachments, write pages, notes and skills, and add media through an **MCP server** (`aicw mcp`) or `aicw tool <name> '<json>'`.

@@ -145,7 +145,9 @@ CREATE TABLE pages(
 CREATE TABLE page_versions(
   id INTEGER PRIMARY KEY, page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
   title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL, saved_at INTEGER NOT NULL, saved_by TEXT NOT NULL);
-CREATE INDEX page_ver ON page_versions(page_id, id);`}
+CREATE INDEX page_ver ON page_versions(page_id, id);`, `
+ALTER TABLE messages ADD COLUMN ext_id TEXT NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX msg_ext ON messages(conversation_id, ext_id) WHERE ext_id <> '';`}
 	if v > 0 && v < len(steps) && s.path != "" && s.path != ":memory:" {
 		// Existing database about to change shape: keep a copy first.
 		if err := copyFile(s.path, fmt.Sprintf("%s.bak-v%d", s.path, v)); err != nil {
