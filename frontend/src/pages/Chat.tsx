@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiTerminal, FiFolder } from 'react-icons/fi'
+import { FiTerminal, FiFolder, FiFileText } from 'react-icons/fi'
 import { api, errMsg } from '../lib/api'
 import { useStore, type Conv } from '../store'
 import { useWorkspace } from '../lib/hooks'
 import { Composer, type Attached } from '../components/Composer'
-import { ModelPicker } from '../components/ModelPicker'
+import { ChatOptions } from '../components/ChatOptions'
 import { MessageView, type Msg } from '../components/MessageView'
 import { TerminalPane } from '../components/TerminalPane'
 import { Button, Confirm, ErrorBox } from '../components/ui'
@@ -131,21 +131,18 @@ export default function Chat() {
   return (
     <div className="flex h-full min-w-0">
       <section className="flex min-w-0 flex-1 flex-col" aria-label="Conversation">
-        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-2.5">
-          <Title conv={conv} onRename={async (t) => { try { await api.RenameConversation(convId, t); refreshConvs() } catch (e) { setError(errMsg(e)) } }} />
-          <div className="flex items-center gap-2">
-            <button disabled={busy || working || !convId || empty} onClick={() => send('/write-pages', []).catch((e) => setError(errMsg(e)))}
-              title="The agent writes everything from this conversation into project pages by itself (same as typing /write-pages)"
-              className="rounded-lg border border-line px-2.5 py-1 text-xs font-bold text-fg hover:bg-line/60 disabled:opacity-40">Write to pages</button>
-            <label className="flex items-center gap-2 text-xs text-mute" title="When off, the agent answers and reads files but cannot change them in chat. The terminal always uses the agent's own permission prompts.">
-              <input type="checkbox" checked={edits} onChange={async (e) => { setEdits(e.target.checked); try { await api.SetChatEdits(e.target.checked) } catch (x) { setError(errMsg(x)); setEdits(!e.target.checked) } }} /> Allow file edits
-            </label>
+        <header className="flex items-center gap-3 border-b border-line px-5 py-2.5">
+          <div className="min-w-0 flex-1"><Title conv={conv} onRename={async (t) => { try { await api.RenameConversation(convId, t); refreshConvs() } catch (e) { setError(errMsg(e)) } }} /></div>
+          <div className="flex shrink-0 items-center gap-2">
             {conv && (
-              <select aria-label="Agent for this chat" value={conv.agent || 'claude'} onChange={async (e) => { try { await api.SetConversationAgent(conv.id, e.target.value); refreshConvs() } catch (x) { setError(errMsg(x)) } }} className="rounded-lg border border-line bg-bg px-2 py-1 text-xs">
-                {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}<option value="shell">Plain shell</option>
-              </select>)}
-            {conv && <ModelPicker agent={conv.agent || 'claude'} onError={setError} />}
-            <Button variant={termOpen ? 'primary' : 'secondary'} onClick={toggleTerm} aria-pressed={termOpen}>
+              <ChatOptions agent={conv.agent || 'claude'} agents={agents} edits={edits} onError={setError}
+                onAgent={async (id) => { try { await api.SetConversationAgent(conv.id, id); refreshConvs() } catch (x) { setError(errMsg(x)) } }}
+                onEdits={async (on) => { setEdits(on); try { await api.SetChatEdits(on) } catch (x) { setError(errMsg(x)); setEdits(!on) } }} />)}
+            <Button disabled={busy || working || !convId || empty} onClick={() => send('/write-pages', []).catch((e) => setError(errMsg(e)))} className="whitespace-nowrap"
+              title="The agent writes everything from this conversation into project pages by itself (same as typing /write-pages)">
+              <FiFileText aria-hidden /> Write to pages
+            </Button>
+            <Button variant={termOpen ? 'primary' : 'secondary'} onClick={toggleTerm} aria-pressed={termOpen} className="whitespace-nowrap">
               <FiTerminal aria-hidden /> Terminal {running && <span className="h-2 w-2 rounded-full bg-ok" aria-label="running" />}
             </Button>
           </div>
@@ -207,7 +204,7 @@ function Title({ conv, onRename }: { conv?: Conv; onRename: (t: string) => void 
   const [v, setV] = useState('')
   if (!conv) return <h2 className="text-base font-bold text-mute">New chat</h2>
   if (edit) return <input autoFocus aria-label="Chat title" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => { setEdit(false); if (v.trim() && v !== conv.title) onRename(v) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEdit(false) }} className="w-72 rounded-lg border border-line bg-bg px-2 py-1 font-bold" />
-  return <button className="truncate rounded-lg px-2 py-1 text-left text-base font-bold hover:bg-raised" title="Rename" onClick={() => { setV(conv.title); setEdit(true) }}>{conv.title}</button>
+  return <button className="block max-w-full truncate rounded-lg px-2 py-1 text-left text-base font-bold hover:bg-raised" title="Rename" onClick={() => { setV(conv.title); setEdit(true) }}>{conv.title}</button>
 }
 
 function Welcome() {
