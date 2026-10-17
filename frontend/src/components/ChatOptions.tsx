@@ -38,8 +38,8 @@ export function ChatOptions({ agent, agents, edits, onAgent, onEdits, onError }:
           {agent !== 'shell' && (
             <div>
               <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-mute">Model</span>
-              <ModelPicker agent={agent} onError={onError} className="!w-full !px-2.5 !py-1.5 !text-sm" />
-              <p className="mt-1 text-xs text-mute">Empty uses the agent’s own default. Applies from the next message.</p>
+              <ModelPicker agent={agent} onError={onError} />
+              <p className="mt-1 text-xs text-mute">Applies from the next message. Nothing chosen means the agent picks its own.</p>
             </div>)}
           <label className="flex cursor-pointer items-start gap-3">
             <input type="checkbox" aria-label="Allow file edits" checked={edits} onChange={(e) => onEdits(e.target.checked)} className="mt-0.5" />

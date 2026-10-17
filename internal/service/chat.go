@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"aicw/internal/agents"
@@ -18,6 +19,7 @@ import (
 	"aicw/internal/contextbuilder"
 	"aicw/internal/markdown"
 	"aicw/internal/media"
+	"aicw/internal/models"
 	"aicw/internal/rules"
 	"aicw/internal/storage"
 	"aicw/internal/term"
@@ -363,7 +365,9 @@ func (s *Service) TermStart(o TermStartOptions) (*TermInfo, error) {
 			info.Fallback = "Install it or set its path in Settings → AI agents. You can still open a plain shell terminal."
 			return info, nil
 		}
-		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path, Model: s.GetSettings().AgentModels[agent]}
+		model, modelEnv := resolveModel(s.GetSettings().AgentModels[agent])
+		env = append(env, modelEnv...)
+		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path, Model: model}
 		if o.Mode == "resume" && conv.SessionID != 0 {
 			if sess, err = s.Store.Session(conv.SessionID); err == nil {
 				req.Mode, req.SessionID = agents.ModeResume, sess.ExternalID
@@ -742,7 +746,8 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 		sess, _ = s.Store.Session(conv.SessionID)
 	}
 	first := sess == nil
-	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits, Model: s.GetSettings().AgentModels[agent]}
+	model, modelEnv := resolveModel(s.GetSettings().AgentModels[agent])
+	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits, Model: model}
 	if first {
 		req.NewID = newUUID()
 		if agent != "claude" { // others get the context package path; Claude gets rules + MCP tools instead
@@ -790,7 +795,7 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 	defer cancel()
 	cmd := exec.CommandContext(runCtx, launch.Exe, launch.Args...)
 	cmd.Dir = w.Path
-	cmd.Env = append(os.Environ(), "TERM=dumb", "NO_COLOR=1", "AICW_WORKSPACE="+w.Path, fmt.Sprintf("AICW_CONVERSATION=%d", convID),
+	cmd.Env = append(append(os.Environ(), modelEnv...), "TERM=dumb", "NO_COLOR=1", "AICW_WORKSPACE="+w.Path, fmt.Sprintf("AICW_CONVERSATION=%d", convID),
 		"PATH="+filepath.Dir(selfExe)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	killTreeOnCancel(cmd)
 	if launch.Stdin != "" {
@@ -901,3 +906,46 @@ func (s *Service) VoiceStopAttach(wsID int64) (*VoiceResult, error) {
 
 // SlashCommands lists the fixed composer commands for the "/" menu.
 func (s *Service) SlashCommands() []commands.Command { return commands.All() }
+
+// resolveModel splits a stored model choice into the name the CLI gets and any
+// environment it needs (local models point Claude Code at the local server).
+func resolveModel(stored string) (string, []string) {
+	name, env, _ := models.LocalEnv(stored)
+	return name, env
+}
+
+var (
+	modelCacheMu sync.Mutex
+	modelCache   = map[string]modelCacheEntry{}
+)
+
+type modelCacheEntry struct {
+	at  time.Time
+	res models.Result
+}
+
+// ListModels returns the models offered for an agent's model list. Results are
+// cached briefly because listing can start the CLI or probe local servers.
+func (s *Service) ListModels(agent string, refresh bool) models.Result {
+	modelCacheMu.Lock()
+	if e, ok := modelCache[agent]; ok && !refresh && time.Since(e.at) < 45*time.Second {
+		modelCacheMu.Unlock()
+		return e.res
+	}
+	modelCacheMu.Unlock()
+	exe := ""
+	if _, ok := s.Reg.Get(agent); ok {
+		exe = s.Reg.Detect(context.Background(), agent).Path
+	}
+	res := models.Discover(context.Background(), agent, exe)
+	if res.Models == nil {
+		res.Models = []models.Model{}
+	}
+	if res.Notes == nil {
+		res.Notes = []string{}
+	}
+	modelCacheMu.Lock()
+	modelCache[agent] = modelCacheEntry{time.Now(), res}
+	modelCacheMu.Unlock()
+	return res
+}
