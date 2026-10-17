@@ -3,6 +3,7 @@
 import {storage} from '../models';
 import {commands} from '../models';
 import {models} from '../models';
+import {localllm} from '../models';
 import {markdown} from '../models';
 import {service} from '../models';
 import {contextbuilder} from '../models';
@@ -193,6 +194,16 @@ export function TogglePin(arg1:number):Promise<boolean>;
 export function UpdateMedia(arg1:number,arg2:string,arg3:boolean):Promise<void>;
 
 export function VoiceCancel():Promise<void>;
+
+export function LocalEngineInstall(arg1:boolean):Promise<void>;
+
+export function LocalModelDelete(arg1:string,arg2:boolean):Promise<void>;
+
+export function LocalModelDownload(arg1:string,arg2:boolean):Promise<void>;
+
+export function LocalModels():Promise<localllm.Status>;
+
+export function LocalServerStop():Promise<void>;
 
 export function ListModels(arg1:string,arg2:boolean):Promise<models.Result>;
 

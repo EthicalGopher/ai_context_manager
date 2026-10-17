@@ -322,6 +322,73 @@ export namespace history {
 
 }
 
+export namespace localllm {
+	
+	export class Entry {
+	    id: string;
+	    name: string;
+	    file: string;
+	    url: string;
+	    size: number;
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.file = source["file"];
+	        this.url = source["url"];
+	        this.size = source["size"];
+	        this.note = source["note"];
+	    }
+	}
+	export class Local {
+	    file: string;
+	    name: string;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Local(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.file = source["file"];
+	        this.name = source["name"];
+	        this.size = source["size"];
+	    }
+	}
+	export class Status {
+	    engineInstalled: boolean;
+	    engineVersion: string;
+	    models: Local[];
+	    catalog: Entry[];
+	    running: string;
+	    dir: string;
+	    notes: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Status(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engineInstalled = source["engineInstalled"];
+	        this.engineVersion = source["engineVersion"];
+	        this.models = source["models"];
+	        this.catalog = source["catalog"];
+	        this.running = source["running"];
+	        this.dir = source["dir"];
+	        this.notes = source["notes"];
+	    }
+	}
+
+}
+
 export namespace markdown {
 	
 	export class AuditEntry {

@@ -24,6 +24,7 @@ import (
 	"aicw/internal/cli"
 	"aicw/internal/contextbuilder"
 	"aicw/internal/history"
+	"aicw/internal/localllm"
 	"aicw/internal/markdown"
 	"aicw/internal/media"
 	"aicw/internal/process"
@@ -95,6 +96,7 @@ type Service struct {
 	chatQueue  map[int64][]string
 	mirrorOff  map[int64]int64 // conversation -> bytes of its session transcript already mirrored
 	mirrorBusy map[int64]bool
+	LLM        *localllm.Manager
 }
 
 func New(dataDir, version string) (*Service, error) {
@@ -103,7 +105,7 @@ func New(dataDir, version string) (*Service, error) {
 		return nil, err
 	}
 	s := &Service{Store: st, WS: &workspace.Manager{Store: st}, Reg: agents.NewRegistry(), DataDir: dataDir, Version: version,
-		term: term.NewManager(), rec: &voice.Recorder{}, convTerm: map[int64]string{}, termConv: map[string]int64{}, termSession: map[string]int64{}, chatCancel: map[int64]context.CancelFunc{}, chatQueue: map[int64][]string{}, mirrorOff: map[int64]int64{}, mirrorBusy: map[int64]bool{}}
+		term: term.NewManager(), rec: &voice.Recorder{}, convTerm: map[int64]string{}, termConv: map[string]int64{}, termSession: map[string]int64{}, chatCancel: map[int64]context.CancelFunc{}, chatQueue: map[int64][]string{}, mirrorOff: map[int64]int64{}, mirrorBusy: map[int64]bool{}, LLM: localllm.New(dataDir)}
 	s.term.OnData = func(id string, d []byte) {
 		s.emit("term:data", map[string]string{"id": id, "data": base64.StdEncoding.EncodeToString(d)})
 	}
@@ -127,7 +129,7 @@ type Lifecycle struct{ s *Service }
 func (s *Service) Lifecycle() *Lifecycle { return &Lifecycle{s} }
 
 func (l *Lifecycle) Startup(ctx context.Context)                  { l.s.ctx = ctx }
-func (l *Lifecycle) Close()                                       { l.s.term.CloseAll(); l.s.Store.Close() }
+func (l *Lifecycle) Close()                                       { l.s.term.CloseAll(); l.s.LLM.Stop(); l.s.Store.Close() }
 func (l *Lifecycle) HandleExternalOpen(args []string, cwd string) { l.s.handleExternalOpen(args, cwd) }
 
 func (s *Service) applySettings() {
@@ -662,8 +664,8 @@ func (s *Service) Launch(o LaunchOptions) (*LaunchResult, error) {
 	st := s.Reg.Detect(context.Background(), o.Agent)
 	res.Disclosure = fmt.Sprintf("Launching %s will let it read and edit files and run commands in %s (per its own permission settings). The context package and anything the agent reads is sent to that tool's provider.", prof.DisplayName, w.Path)
 
-	model, modelEnv := resolveModel(s.GetSettings().AgentModels[o.Agent])
-	if len(modelEnv) > 0 {
+	model := s.GetSettings().AgentModels[o.Agent]
+	if strings.HasPrefix(model, localPrefix) {
 		res.Error = "A local model runs in the in-app Terminal panel or in chat replies, not in an external terminal. Use the Terminal panel, or pick a hosted model."
 		return res, nil
 	}

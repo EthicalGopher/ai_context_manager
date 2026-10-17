@@ -17,6 +17,7 @@ import (
 	"aicw/internal/agents"
 	"aicw/internal/commands"
 	"aicw/internal/contextbuilder"
+	"aicw/internal/localllm"
 	"aicw/internal/markdown"
 	"aicw/internal/media"
 	"aicw/internal/models"
@@ -365,7 +366,11 @@ func (s *Service) TermStart(o TermStartOptions) (*TermInfo, error) {
 			info.Fallback = "Install it or set its path in Settings → AI agents. You can still open a plain shell terminal."
 			return info, nil
 		}
-		model, modelEnv := resolveModel(s.GetSettings().AgentModels[agent])
+		model, modelEnv, merr := s.resolveModel(agent, s.GetSettings().AgentModels[agent])
+		if merr != nil {
+			info.Error = merr.Error()
+			return info, nil
+		}
 		env = append(env, modelEnv...)
 		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path, Model: model}
 		if o.Mode == "resume" && conv.SessionID != 0 {
@@ -395,6 +400,9 @@ func (s *Service) TermStart(o TermStartOptions) (*TermInfo, error) {
 				return nil, err
 			}
 			req.Extra = []string{"--mcp-config", cfg, "--append-system-prompt", rules.Prompt(s.skillsFor(w.ID))}
+			if len(modelEnv) > 0 {
+				req.Extra = append(req.Extra, "--strict-mcp-config")
+			}
 		}
 		spec, err := agents.BuildLaunch(prof, req)
 		if err != nil {
@@ -746,7 +754,11 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 		sess, _ = s.Store.Session(conv.SessionID)
 	}
 	first := sess == nil
-	model, modelEnv := resolveModel(s.GetSettings().AgentModels[agent])
+	model, modelEnv, merr := s.resolveModel(agent, s.GetSettings().AgentModels[agent])
+	if merr != nil {
+		s.postSystem(convID, merr.Error())
+		return
+	}
 	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits, Model: model}
 	if first {
 		req.NewID = newUUID()
@@ -770,6 +782,9 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 		// Headless runs can't ask for permission, so AICW's own tools (notes,
 		// pages, skills) are pre-approved; file edits stay governed by the toggle.
 		req.Extra = []string{"--mcp-config", cfg, "--allowedTools", "mcp__aicw", "--append-system-prompt", rules.Prompt(s.skillsFor(w.ID))}
+		if len(modelEnv) > 0 {
+			req.Extra = append(req.Extra, "--strict-mcp-config") // a local model can't carry every MCP server's tool list
+		}
 	}
 	launch, err := agents.BuildChat(prof, req)
 	if err != nil {
@@ -907,11 +922,26 @@ func (s *Service) VoiceStopAttach(wsID int64) (*VoiceResult, error) {
 // SlashCommands lists the fixed composer commands for the "/" menu.
 func (s *Service) SlashCommands() []commands.Command { return commands.All() }
 
-// resolveModel splits a stored model choice into the name the CLI gets and any
-// environment it needs (local models point Claude Code at the local server).
-func resolveModel(stored string) (string, []string) {
-	name, env, _ := models.LocalEnv(stored)
-	return name, env
+const localPrefix = "aicw:"
+
+// resolveModel turns a stored model choice into the name the CLI gets plus any
+// environment it needs. A model downloaded by AICW ("aicw:<file>.gguf") starts
+// the local engine if necessary and points Claude Code at it.
+func (s *Service) resolveModel(agent, stored string) (string, []string, error) {
+	file, ok := strings.CutPrefix(stored, localPrefix)
+	if !ok {
+		return stored, nil, nil
+	}
+	if agent != "claude" {
+		return "", nil, fmt.Errorf("local models run through Claude Code; choose another model for this agent")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+	base, err := s.LLM.Ensure(ctx, file)
+	if err != nil {
+		return "", nil, err
+	}
+	return strings.TrimSuffix(file, filepath.Ext(file)), []string{"ANTHROPIC_BASE_URL=" + base, "ANTHROPIC_AUTH_TOKEN=local", "ANTHROPIC_API_KEY="}, nil
 }
 
 var (
@@ -938,6 +968,18 @@ func (s *Service) ListModels(agent string, refresh bool) models.Result {
 		exe = s.Reg.Detect(context.Background(), agent).Path
 	}
 	res := models.Discover(context.Background(), agent, exe)
+	if agent == "claude" {
+		n := 0
+		for _, l := range s.LLM.Status().Models {
+			if agents.ValidModel(localPrefix+l.File) == nil {
+				res.Models = append(res.Models, models.Model{ID: localPrefix + l.File, Label: l.Name, Group: "Local · downloaded by AICW"})
+				n++
+			}
+		}
+		if n == 0 {
+			res.Notes = append(res.Notes, "No local model yet. Settings → Local models downloads one (no Ollama or other tool needed).")
+		}
+	}
 	if res.Models == nil {
 		res.Models = []models.Model{}
 	}
@@ -949,3 +991,54 @@ func (s *Service) ListModels(agent string, refresh bool) models.Result {
 	modelCacheMu.Unlock()
 	return res
 }
+
+// ---- local models (llama.cpp engine + GGUF files in AICW's own folder) ----
+
+func (s *Service) LocalModels() localllm.Status { return s.LLM.Status() }
+
+func (s *Service) llmJob(run func(progress func(string, int64, int64)) error) {
+	go func() {
+		err := run(func(msg string, done, total int64) {
+			s.emit("llm:progress", map[string]any{"message": msg, "done": done, "total": total})
+		})
+		modelCacheMu.Lock()
+		delete(modelCache, "claude")
+		modelCacheMu.Unlock()
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+		}
+		s.emit("llm:done", msg)
+	}()
+}
+
+// LocalEngineInstall downloads llama.cpp's server (about 20-30 MB).
+func (s *Service) LocalEngineInstall(confirmed bool) error {
+	if !confirmed {
+		return markdown.ErrNotConfirmed
+	}
+	s.llmJob(func(p func(string, int64, int64)) error { return s.LLM.InstallEngine(context.Background(), p) })
+	return nil
+}
+
+// LocalModelDownload downloads a catalogue model (1-5 GB).
+func (s *Service) LocalModelDownload(id string, confirmed bool) error {
+	if !confirmed {
+		return markdown.ErrNotConfirmed
+	}
+	s.llmJob(func(p func(string, int64, int64)) error { return s.LLM.Download(context.Background(), id, p) })
+	return nil
+}
+
+func (s *Service) LocalModelDelete(file string, confirmed bool) error {
+	if !confirmed {
+		return markdown.ErrNotConfirmed
+	}
+	modelCacheMu.Lock()
+	delete(modelCache, "claude")
+	modelCacheMu.Unlock()
+	return s.LLM.Delete(file)
+}
+
+// LocalServerStop stops the local engine to free memory; it restarts on demand.
+func (s *Service) LocalServerStop() { s.LLM.Stop() }

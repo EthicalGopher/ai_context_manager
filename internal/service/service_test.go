@@ -846,27 +846,54 @@ func TestAgentModelSettingValidatedAndUsed(t *testing.T) {
 	}
 }
 
-func TestLocalModelPointsTheAgentAtTheLocalServer(t *testing.T) {
+func TestAICWLocalModelStartsEngineAndPointsClaudeAtIt(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("needs a shell")
+	}
 	s := newSvc(t)
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "fakelocal"), []byte("#!/bin/sh\necho \"url=$ANTHROPIC_BASE_URL key=[$ANTHROPIC_API_KEY] args=$*\"\n"), 0o755)
+	os.WriteFile(filepath.Join(dir, "claude"), []byte("#!/bin/sh\ncat >/dev/null\necho \"url=$ANTHROPIC_BASE_URL key=[$ANTHROPIC_API_KEY] args=$*\"\n"), 0o755)
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	if err := s.AddCustomAgent(`{"id":"fakelocal","displayName":"Fake Local","executables":["fakelocal"],"handoff":"none","capabilities":{"newSession":true},
-		"modelArgs":["--model","{model}"],"chat":{"newArgs":["--print","{prompt}"],"continueArgs":["--continue","--print","{prompt}"]}}`); err != nil {
-		t.Fatal(err)
-	}
+	// A stand-in llama-server that answers /health on the requested port.
+	engine := filepath.Join(s.LLM.Root, "engine")
+	os.MkdirAll(engine, 0o700)
+	os.WriteFile(filepath.Join(engine, "llama-server"), []byte("#!/bin/sh\nwhile [ $# -gt 0 ]; do [ \"$1\" = --port ] && port=$2; shift; done\nexec python3 -I -m http.server $port --bind 127.0.0.1 >/dev/null 2>&1\n"), 0o755)
+	os.WriteFile(filepath.Join(engine, "health"), []byte("ok"), 0o600)
+	os.MkdirAll(filepath.Join(s.LLM.Root, "models"), 0o700)
+	os.WriteFile(filepath.Join(s.LLM.Root, "models", "tiny-3b.gguf"), []byte("x"), 0o600)
+
 	st := s.GetSettings()
-	st.AgentModels = map[string]string{"fakelocal": "ollama:llama3.2:latest"}
+	st.AgentModels = map[string]string{"claude": "aicw:tiny-3b.gguf"}
 	if err := s.SaveSettings(st); err != nil {
 		t.Fatal(err)
 	}
+	if m := s.ListModels("claude", true); !func() bool {
+		for _, x := range m.Models {
+			if x.ID == "aicw:tiny-3b.gguf" && strings.HasPrefix(x.Group, "Local") {
+				return true
+			}
+		}
+		return false
+	}() {
+		t.Fatalf("the downloaded model must be in the list: %+v", m)
+	}
 	r, _ := s.OpenWorkspace(project(t), false)
-	conv, _ := s.NewConversation(r.Workspace.ID, "", "fakelocal")
+	conv, _ := s.NewConversation(r.Workspace.ID, "", "claude")
 	s.SendMessage(SendOptions{ConversationID: conv.ID, Text: "hi", Mode: "chat"})
 	waitIdle(t, s, conv.ID)
 	msgs, _ := s.Messages(conv.ID, 0)
 	got := msgs[len(msgs)-1].Body
-	if !strings.Contains(got, "url=http://localhost:11434") || !strings.Contains(got, "key=[]") || !strings.Contains(got, "--model llama3.2:latest") || strings.Contains(got, "ollama:") {
-		t.Fatalf("local model must set the server and pass the bare name: %q", got)
+	if !strings.Contains(got, "url=http://127.0.0.1:") || !strings.Contains(got, "key=[]") || !strings.Contains(got, "--model tiny-3b") || !strings.Contains(got, "--strict-mcp-config") || strings.Contains(got, "aicw:") {
+		t.Fatalf("local model must set the server, pass the bare name and skip other MCP servers: %q", got)
+	}
+	if s.LLM.Status().Running != "tiny-3b.gguf" {
+		t.Fatal("engine should be running")
+	}
+	s.LocalServerStop()
+	if s.LLM.Status().Running != "" {
+		t.Fatal("engine should be stopped")
+	}
+	if err := s.LocalEngineInstall(false); err == nil {
+		t.Fatal("downloads need confirmation")
 	}
 }
