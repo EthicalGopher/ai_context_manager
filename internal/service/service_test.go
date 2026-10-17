@@ -824,3 +824,24 @@ func TestSlashCommandShownAsTypedButAgentGetsFullPrompt(t *testing.T) {
 		t.Fatal("commands should be listed")
 	}
 }
+
+func TestAgentModelSettingValidatedAndUsed(t *testing.T) {
+	s := newSvc(t)
+	fakeChatAgent(t, s, `echo "args: $*"`)
+	st := s.GetSettings()
+	st.AgentModels = map[string]string{"claude": "--bad"}
+	if err := s.SaveSettings(st); err == nil {
+		t.Fatal("a model that looks like an option must be refused")
+	}
+	st.AgentModels = map[string]string{"nope": "x"}
+	if err := s.SaveSettings(st); err == nil {
+		t.Fatal("unknown agent must be refused")
+	}
+	st.AgentModels = map[string]string{"claude": " opus ", "kilo": ""}
+	if err := s.SaveSettings(st); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.GetSettings().AgentModels; got["claude"] != "opus" || len(got) != 1 {
+		t.Fatalf("%v", got)
+	}
+}

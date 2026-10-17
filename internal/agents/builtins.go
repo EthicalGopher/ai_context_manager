@@ -11,6 +11,7 @@ func Builtins() []Profile {
 	return []Profile{
 		{
 			ID: "claude", DisplayName: "Claude Code", Executables: []string{"claude"}, Builtin: true,
+			ModelArgs: []string{"--model", "{model}"}, ModelHints: []string{"sonnet", "opus", "haiku"},
 			Docs:          "https://docs.claude.com/en/docs/claude-code/cli-reference",
 			Caps:          Capabilities{NewSession: true, ResumeByID: true, ContinueLast: true, AssignSessionID: true, InitialPrompt: true, ReadsInstrFiles: true, NonInteractive: true, PermissionModes: true},
 			SessionIDArgs: []string{"--session-id", "{session}"}, ResumeArgs: []string{"--resume", "{session}"}, ContinueArgs: []string{"--continue"},
@@ -20,6 +21,7 @@ func Builtins() []Profile {
 		},
 		{
 			ID: "codex", DisplayName: "OpenAI Codex CLI", Executables: []string{"codex"}, Builtin: true,
+			ModelArgs:  []string{"--model", "{model}"},
 			Docs:       "https://github.com/openai/codex",
 			Caps:       Capabilities{NewSession: true, ResumeByID: true, ContinueLast: true, InitialPrompt: true, ReadsInstrFiles: true, NonInteractive: true, PermissionModes: true, WorkingDirFlag: true},
 			ResumeArgs: []string{"resume", "{session}"}, ContinueArgs: []string{"resume", "--last"},
@@ -28,6 +30,7 @@ func Builtins() []Profile {
 		},
 		{
 			ID: "gemini", DisplayName: "Gemini CLI", Executables: []string{"gemini"}, Builtin: true,
+			ModelArgs:  []string{"--model", "{model}"},
 			Docs:       "https://github.com/google-gemini/gemini-cli",
 			Caps:       Capabilities{NewSession: true, InitialPrompt: true, ReadsInstrFiles: true, NonInteractive: true, PermissionModes: true},
 			PromptArgs: []string{"-i", ContextPrompt}, Handoff: HandoffPromptArg, Verified: false,
@@ -35,15 +38,17 @@ func Builtins() []Profile {
 		},
 		{
 			ID: "kilo", DisplayName: "Kilo", Executables: []string{"kilo", "kilocode"}, Builtin: true,
+			ModelArgs:  []string{"--model", "{model}"},
 			Docs:       "https://kilo.ai/docs",
 			Caps:       Capabilities{NewSession: true, ResumeByID: true, ContinueLast: true, InitialPrompt: true, ReadsInstrFiles: true, NonInteractive: true, PermissionModes: true},
 			ResumeArgs: []string{"--session", "{session}"}, ContinueArgs: []string{"--continue"},
 			PromptArgs: []string{"--prompt", ContextPrompt}, Handoff: HandoffPromptArg, Verified: true, VerifiedVersion: "7.4.21",
-			Notes: "Verified from `kilo --help`: --prompt, --session, --continue. Kilo chooses its own session IDs.",
+			Notes: "Verified from `kilo --help`: --prompt, --session, --continue. Kilo chooses its own session IDs. Models are provider/model; run `kilo models` to list them, including local providers you configured.",
 			Chat:  &ChatSpec{NewArgs: []string{"run", "{prompt}"}, ContinueArgs: []string{"run", "--continue", "{prompt}"}, EditArgs: []string{"--auto"}},
 		},
 		{
 			ID: "agy", DisplayName: "AGY", Executables: []string{"agy"}, Builtin: true,
+			ModelArgs:  []string{"--model", "{model}"},
 			Docs:       "run `agy --help`",
 			Caps:       Capabilities{NewSession: true, ResumeByID: true, ContinueLast: true, InitialPrompt: true, NonInteractive: true, PermissionModes: true},
 			ResumeArgs: []string{"--conversation", "{session}"}, ContinueArgs: []string{"--continue"},

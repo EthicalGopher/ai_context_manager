@@ -363,7 +363,7 @@ func (s *Service) TermStart(o TermStartOptions) (*TermInfo, error) {
 			info.Fallback = "Install it or set its path in Settings → AI agents. You can still open a plain shell terminal."
 			return info, nil
 		}
-		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path}
+		req := agents.LaunchRequest{Mode: agents.ModeNew, Cwd: w.Path, Exe: st.Path, Model: s.GetSettings().AgentModels[agent]}
 		if o.Mode == "resume" && conv.SessionID != 0 {
 			if sess, err = s.Store.Session(conv.SessionID); err == nil {
 				req.Mode, req.SessionID = agents.ModeResume, sess.ExternalID
@@ -742,7 +742,7 @@ func (s *Service) runChatTurn(ctx context.Context, convID int64, prompt string) 
 		sess, _ = s.Store.Session(conv.SessionID)
 	}
 	first := sess == nil
-	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits}
+	req := agents.ChatRequest{Cwd: w.Path, Exe: st.Path, Prompt: prompt, FirstTurn: first, Edits: s.GetSettings().ChatEdits, Model: s.GetSettings().AgentModels[agent]}
 	if first {
 		req.NewID = newUUID()
 		if agent != "claude" { // others get the context package path; Claude gets rules + MCP tools instead

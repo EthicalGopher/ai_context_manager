@@ -49,6 +49,7 @@ type Settings struct {
 	Theme         string            `json:"theme"`
 	Terminal      string            `json:"terminal"`
 	AgentPaths    map[string]string `json:"agentPaths"`
+	AgentModels   map[string]string `json:"agentModels"`  // agent id -> model name passed to its CLI ("" = the CLI's own default)
 	AutoTerminal  bool              `json:"autoTerminal"` // open and start the agent terminal when a chat opens
 	ChatEdits     bool              `json:"chatEdits"`    // let chat replies edit files (off by default)
 	VoiceCommand  string            `json:"voiceCommand"`
@@ -58,7 +59,7 @@ type Settings struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{DefaultAgent: "claude", DefaultMode: "clean", Budget: 8000, IgnoreDirs: scanner.DefaultOptions().IgnoreDirs, IgnoreGlobs: []string{}, Pinned: []string{}, AutoTerminal: true, MaxFileKB: 512, ConfirmWrites: true, Theme: "dark", AgentPaths: map[string]string{}}
+	return Settings{DefaultAgent: "claude", DefaultMode: "clean", Budget: 8000, IgnoreDirs: scanner.DefaultOptions().IgnoreDirs, IgnoreGlobs: []string{}, Pinned: []string{}, AutoTerminal: true, MaxFileKB: 512, ConfirmWrites: true, Theme: "dark", AgentPaths: map[string]string{}, AgentModels: map[string]string{}}
 }
 
 // WorkspaceState is per-workspace saved UI/context state.
@@ -161,6 +162,9 @@ func (s *Service) GetSettings() Settings {
 	if d.AgentPaths == nil {
 		d.AgentPaths = map[string]string{}
 	}
+	if d.AgentModels == nil {
+		d.AgentModels = map[string]string{}
+	}
 	if d.Pinned == nil {
 		d.Pinned = []string{}
 	}
@@ -185,6 +189,24 @@ func (s *Service) SaveSettings(st Settings) error {
 		if _, ok := s.Reg.Get(k); !ok {
 			return fmt.Errorf("unknown agent %q", k)
 		}
+	}
+	for k, v := range st.AgentModels {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			delete(st.AgentModels, k)
+			continue
+		}
+		p, ok := s.Reg.Get(k)
+		if !ok {
+			return fmt.Errorf("unknown agent %q", k)
+		}
+		if len(p.ModelArgs) == 0 {
+			return fmt.Errorf("%s has no known model option", p.DisplayName)
+		}
+		if err := agents.ValidModel(v); err != nil {
+			return err
+		}
+		st.AgentModels[k] = v
 	}
 	b, _ := json.Marshal(st)
 	if err := s.Store.SetSetting("settings", string(b)); err != nil {
@@ -640,7 +662,7 @@ func (s *Service) Launch(o LaunchOptions) (*LaunchResult, error) {
 	st := s.Reg.Detect(context.Background(), o.Agent)
 	res.Disclosure = fmt.Sprintf("Launching %s will let it read and edit files and run commands in %s (per its own permission settings). The context package and anything the agent reads is sent to that tool's provider.", prof.DisplayName, w.Path)
 
-	req := agents.LaunchRequest{Mode: mode, Cwd: w.Path, Exe: st.Path}
+	req := agents.LaunchRequest{Mode: mode, Cwd: w.Path, Exe: st.Path, Model: s.GetSettings().AgentModels[o.Agent]}
 	if mode == agents.ModeResume {
 		req.SessionID = sess.ExternalID
 	} else {
