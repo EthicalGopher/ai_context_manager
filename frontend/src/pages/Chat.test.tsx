@@ -67,6 +67,7 @@ describe('Chat replies', () => {
   it('file edits are opt-in and the switch persists', async () => {
     apiMock.Messages.mockResolvedValue([msg({ id: 1 })])
     renderAt('/c/5')
+    await userEvent.click(await screen.findByRole('button', { name: /Claude|Agent|Plain shell|claude/i }))
     const box = await screen.findByLabelText('Allow file edits')
     expect(box).not.toBeChecked()
     await userEvent.click(box)
