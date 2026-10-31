@@ -1033,9 +1033,12 @@ func (s *Service) MediaHandler() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox")
 		disp := "inline"
-		if m.Kind == "file" {
+		if m.Kind == "file" || r.URL.Query().Get("download") != "" {
 			disp = "attachment"
 		}
+		// Stored files never change, so the webview may cache them; Range
+		// requests (seeking) then don't re-read from disk each time.
+		w.Header().Set("Cache-Control", "private, max-age=3600")
 		w.Header().Set("Content-Disposition", disp+`; filename="`+media.SafeName(m.Name)+`"`)
 		http.ServeContent(w, r, m.Name, st.ModTime(), f)
 	})

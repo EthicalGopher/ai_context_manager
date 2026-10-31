@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiEdit2, FiClock, FiTrash2, FiPlus, FiEye, FiImage } from 'react-icons/fi'
+import { FiEdit2, FiClock, FiTrash2, FiPlus, FiEye, FiImage, FiDownload } from 'react-icons/fi'
 import { api, errMsg, fmtTime } from '../lib/api'
 import { useWorkspace } from '../lib/hooks'
 import { MediaCatalog, RichMarkdown, type MediaInfo } from '../components/RichMarkdown'
@@ -29,6 +29,7 @@ export default function PagesView() {
   const [draft, setDraft] = useState({ title: '', summary: '', body: '' })
   const [hist, setHist] = useState<any[] | null>(null)
   const [del, setDel] = useState(false)
+  const [saved, setSaved] = useState('')
   const loadMedia = useCallback(async () => { if (ws) setMedia(((await api.ListMedia(ws.id)) as any) ?? []) }, [ws?.id])
   useEffect(() => { loadMedia(); const t = setInterval(() => { if (!document.hidden) loadMedia() }, 5000); return () => clearInterval(t) }, [loadMedia])
 
@@ -49,6 +50,13 @@ export default function PagesView() {
       if (page && draft.title.trim() !== page.title) await api.RenamePage(page.id, draft.title.trim())
       await api.SavePage(ws.id, draft.title.trim(), draft.summary, draft.body)
       await reload(); setEdit(false)
+    } catch (e) { setError(errMsg(e)) }
+  }
+  const exportPage = async () => {
+    if (!page) return
+    try {
+      const dest = (await api.ExportPage(page.id)) as unknown as string
+      if (dest) setSaved(dest)
     } catch (e) { setError(errMsg(e)) }
   }
   const insert = (m: MediaInfo) => setDraft((d) => ({ ...d, body: d.body.replace(/\s*$/, '') + `\n\n![${m.name}](media:${m.id})\n` }))
@@ -76,6 +84,7 @@ export default function PagesView() {
               <div className="mt-6 flex flex-wrap gap-2">
                 <Button onClick={() => setEdit(true)}><FiEdit2 aria-hidden /> Edit</Button>
                 <Button onClick={async () => setHist(((await api.PageVersions(page.id)) as any) ?? [])}><FiClock aria-hidden /> History</Button>
+                <Button onClick={exportPage}><FiDownload aria-hidden /> Download to share</Button>
                 <Button variant="ghost" onClick={() => setDel(true)}><FiTrash2 aria-hidden /> Delete</Button>
               </div>
               <div className="mt-6">
@@ -108,6 +117,13 @@ export default function PagesView() {
               <li key={v.id}><div className="mb-1 flex items-center justify-between text-xs text-mute"><span>{fmtTime(v.savedAt)} · {v.savedBy}</span>
                 <button className="font-bold text-accent" onClick={() => { setDraft({ title: v.title, summary: v.summary, body: v.body }); setEdit(true); setHist(null) }}>Restore into editor</button></div>
                 <DiffView diff={`--- version\n+++ current\n${v.body.split('\n').map((l: string) => '-' + l).join('\n')}\n${page.body.split('\n').map((l: string) => '+' + l).join('\n')}`} /></li>))}</ul>)}
+        </Modal>)}
+      {saved && (
+        <Modal title="Saved to share" onClose={() => setSaved('')}>
+          <p className="text-sm">Saved <code className="break-all">{saved}</code></p>
+          <p className="mt-2 text-sm text-mute">{saved.toLowerCase().endsWith('.zip')
+            ? 'This page has large media, so it was saved as a zip. Send the zip; your friend unzips it and opens index.html (keep the media folder next to it).'
+            : 'This is one self-contained file with all images, video and audio inside. Send it to anyone; it opens in any browser, no app needed.'}</p>
         </Modal>)}
       {del && page && <Confirm title="Delete this page?" danger confirmLabel="Delete" onCancel={() => setDel(false)} onConfirm={async () => { try { await api.DeletePage(page.id, true); setDel(false); await reload(); navigate('/p') } catch (e) { setError(errMsg(e)); setDel(false) } }}><p className="text-sm">Deletes “{page.title}” and its history. Media files in the library are kept.</p></Confirm>}
     </div>

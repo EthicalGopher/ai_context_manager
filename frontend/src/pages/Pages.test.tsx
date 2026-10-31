@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { apiMock, resetApi } from '../test/mockApi'
@@ -38,6 +38,42 @@ describe('Pages view', () => {
     expect(screen.getByText('Selected visual reference', { selector: 'figcaption' })).toBeInTheDocument()
     expect(document.querySelector('video')).toHaveAttribute('src', '/media/5')
     expect(screen.getByText('Callout text').closest('blockquote')).not.toBeNull()
+  })
+
+  it('downloads the page to share and says what was saved', async () => {
+    apiMock.ExportPage.mockResolvedValue('/home/me/Character.html')
+    renderAt('/p/1')
+    await userEvent.click(await screen.findByRole('button', { name: /download to share/i }))
+    await waitFor(() => expect(apiMock.ExportPage).toHaveBeenCalledWith(1))
+    expect(await screen.findByText('/home/me/Character.html')).toBeInTheDocument()
+    expect(screen.getByText(/one self-contained file/)).toBeInTheDocument()
+  })
+
+  it('explains the zip when the page was too big for one file', async () => {
+    apiMock.ExportPage.mockResolvedValue('/home/me/Character.zip')
+    renderAt('/p/1')
+    await userEvent.click(await screen.findByRole('button', { name: /download to share/i }))
+    expect(await screen.findByText(/saved as a zip/)).toBeInTheDocument()
+  })
+
+  it('does nothing when the save dialog is cancelled', async () => {
+    apiMock.ExportPage.mockResolvedValue('')
+    renderAt('/p/1')
+    await userEvent.click(await screen.findByRole('button', { name: /download to share/i }))
+    await waitFor(() => expect(apiMock.ExportPage).toHaveBeenCalled())
+    expect(screen.queryByText('Saved to share')).toBeNull()
+  })
+
+  it('video falls back to a download link when it cannot be played, and shows buffering', async () => {
+    renderAt('/p/1')
+    const v = await waitFor(() => { const e = document.querySelector('video'); expect(e).not.toBeNull(); return e! })
+    fireEvent.waiting(v)
+    expect(screen.getByRole('status', { name: 'Buffering' })).toBeInTheDocument()
+    fireEvent.playing(v)
+    expect(screen.queryByRole('status', { name: 'Buffering' })).toBeNull()
+    fireEvent.error(v)
+    expect(await screen.findByText(/can't be played here/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Download demo.mp4/ })).toHaveAttribute('href', '/media/5?download=1')
   })
 
   it('shows an empty state that explains how pages get written', async () => {

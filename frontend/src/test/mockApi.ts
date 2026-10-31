@@ -18,6 +18,7 @@ export const apiMock = {
   AuditLog: vi.fn(),
   Sessions: vi.fn(),
   ListMedia: vi.fn(),
+  ExportPage: vi.fn(),
   PickMedia: vi.fn(),
   ImportMedia: vi.fn(),
   DeleteMedia: vi.fn(),
