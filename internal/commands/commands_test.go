@@ -39,3 +39,10 @@ func TestEGMCommands(t *testing.T) {
 		t.Fatal("idea not substituted")
 	}
 }
+
+func TestGoldfishHoldsRounds(t *testing.T) {
+	p, _, ok := Expand("/goldfish")
+	if !ok || !strings.Contains(p, "SAME Goldfish") || !strings.Contains(p, "3 rounds") || strings.Contains(p, "{") {
+		t.Fatalf("%v %q", ok, p)
+	}
+}

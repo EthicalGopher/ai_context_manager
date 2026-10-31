@@ -88,7 +88,12 @@ When it is approved, suggest /goldfish.`,
 2. Antagonistic review: 2-3 Goldfish, each a sceptic with a different angle (edge cases and failure modes; hidden dependencies and integration; security and logic gaps). They only critique.
 3. Implementation readiness: a final Goldfish answers go / no-go: are file paths, data structures and function signatures all present and unambiguous?
 
-Then, as the Elephant, resolve every critique: fix the document, or explain why a point is wrong. Update the saved page. Report: what each Goldfish found, what changed, what remains open, and the go / no-go verdict. Do not write production code. ` + toolHint,
+Then hold a real conversation with them, in rounds (at most 3):
+- As the Elephant, answer every critique: fix the document, or reply with why the point is wrong. Update the saved page.
+- Send each Goldfish your replies and the revised document, continuing the SAME Goldfish (message the subagent you already started, e.g. with SendMessage) instead of starting a new one. They still see only the document and your replies, never our chat. If you cannot continue one, start a new one with the document plus the earlier critique and your reply.
+- Each Goldfish answers: accepted, or still objecting and why. Stop when all accept or after 3 rounds.
+
+Report: for each Goldfish, its findings and final stance; what changed in the document; what remains open; and the go / no-go verdict. Do not write production code. ` + toolHint,
 	},
 }
 
