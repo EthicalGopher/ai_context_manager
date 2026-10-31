@@ -52,6 +52,21 @@ Save it where the project keeps session notes (for example ` + "`.aicw/sessions/
 `,
 		},
 		{
+			ID: "elephant-goldfish", Name: "elephant-goldfish",
+			Description: "Design before code: for any non-trivial change, brainstorm with no code, write a design doc, and have fresh context-free reviewers test it before implementing.",
+			Body: `# Elephant-Goldfish (design first)
+
+For any non-trivial change (new feature, refactor, new module, changed data model), do not start coding straight away. You are the Elephant: the session that holds the project's intent and memory.
+
+1. **Brainstorm** (no code): read the project, discuss trade-offs and alternatives with the user, one question at a time, and record decisions.
+2. **Draft** a design doc: problem, goals and non-goals, technical plan, alternatives rejected, every file to change with functions and signatures, test plan, open questions. Save it as a page.
+3. **Goldfish review**: give only the document (never the conversation) to fresh, zero-context reviewers: a comprehension check, 2-3 skeptical reviewers, and an implementation-readiness go/no-go. Resolve every critique in the document.
+4. Implement only after a "go" and the user's approval.
+
+Skip this for small fixes, typos and one-line changes. The user can run the steps with /brainstorm, /draft and /goldfish.
+`,
+		},
+		{
 			ID: "context-steward", Name: "context-steward",
 			Description: "Inspect existing project guidance before creating new instruction files; avoid duplication and propose updates when stack, commands, architecture or conventions change.",
 			Body: `# Context Steward
