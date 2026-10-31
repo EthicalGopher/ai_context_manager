@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FiFile, FiFileText } from 'react-icons/fi'
+import { VideoPlayer } from './VideoPlayer'
 
 export interface MediaInfo { id: number; name: string; kind: string; size: number }
 /** Lets embedded `media:ID` references render as the right element (image, video, audio, file). */
@@ -16,7 +17,7 @@ function Embed({ id, caption }: { id: number; caption: string }) {
   return (
     <figure className="relative my-6 overflow-hidden rounded-2xl border border-line bg-raised">
       {kind === 'image' && <img src={url(id)} alt={caption || m?.name || 'image'} loading="lazy" className="mx-auto block max-h-[34rem] w-full object-contain" />}
-      {kind === 'video' && <video src={url(id)} controls preload="metadata" className="mx-auto block max-h-[34rem] w-full bg-black" />}
+      {kind === 'video' && <VideoPlayer id={id} name={m?.name ?? 'video'} />}
       {kind === 'audio' && <div className="p-6"><audio src={url(id)} controls className="w-full" /></div>}
       {(kind === 'pdf' || kind === 'file') && <div className="flex items-center gap-3 p-6">{kind === 'pdf' ? <FiFileText aria-hidden /> : <FiFile aria-hidden />}{m?.name ?? 'file'}</div>}
       {caption && <figcaption className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">{caption}</figcaption>}

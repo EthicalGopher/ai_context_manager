@@ -3,16 +3,77 @@ package service
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"aicw/internal/markdown"
 	"aicw/internal/media"
+	"aicw/internal/pagehtml"
 	"aicw/internal/safety"
 	"aicw/internal/storage"
 )
+
+// pageExport renders a page for sharing: one self-contained .html file, or a
+// .zip (index.html + media/) when its media is too big to embed.
+func (s *Service) pageExport(pageID int64) (name string, write func(io.Writer) error, err error) {
+	p, err := s.Store.Page(pageID)
+	if err != nil {
+		return "", nil, errors.New("page not found")
+	}
+	root := filepath.Join(s.DataDir, "media")
+	plan, err := pagehtml.New(p.Title, p.Summary, p.Body, func(id int64) (pagehtml.Media, bool) {
+		m, err := s.Store.Media(id)
+		if err != nil || m.WorkspaceID != p.WorkspaceID || !safety.Contains(root, m.Stored) {
+			return pagehtml.Media{}, false
+		}
+		return pagehtml.Media{ID: m.ID, Name: m.Name, Kind: m.Kind, Mime: m.Mime, Path: m.Stored, Size: m.Size}, true
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	base := strings.Trim(media.SafeName(p.Title), " .")
+	if base == "" {
+		base = "page"
+	}
+	if plan.NeedZ {
+		return base + ".zip", plan.WriteZip, nil
+	}
+	doc, err := plan.HTML(true)
+	if err != nil {
+		return "", nil, err
+	}
+	return base + ".html", func(w io.Writer) error { _, err := io.WriteString(w, doc); return err }, nil
+}
+
+// ExportPage asks where to save and writes the page as a file to send to
+// friends. It returns the saved path (empty if cancelled).
+func (s *Service) ExportPage(pageID int64) (string, error) {
+	name, write, err := s.pageExport(pageID)
+	if err != nil {
+		return "", err
+	}
+	if s.ctx == nil {
+		return "", errors.New("no window")
+	}
+	dest, err := runtime.SaveFileDialog(s.ctx, runtime.SaveDialogOptions{Title: "Save page to share", DefaultFilename: name})
+	if err != nil || dest == "" {
+		return "", err
+	}
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return "", err
+	}
+	if err := write(f); err != nil {
+		f.Close()
+		return "", err
+	}
+	return dest, f.Close()
+}
 
 func (s *Service) ListPages(wsID int64) ([]storage.Page, error) { return s.Store.Pages(wsID) }
 
