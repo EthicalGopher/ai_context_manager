@@ -5,7 +5,7 @@
 Product pivot to a ChatGPT-style app.
 
 - Chat with your AI CLI: replies posted as messages (Claude Code, Kilo, AGY), queue + Stop, edits opt-in; attachments (images, audio, video, PDFs) by picker, drop or paste.
-- Elephant-Goldfish design workflow (after Google's EGM plugin): `/egm-brainstorm` (design talk, no code), `/egm-draft` (design doc saved as a page), `/egm-review` (fresh context-free "goldfish" reviewers: comprehension check, antagonistic review, implementation-readiness go/no-go).
+- Elephant-Goldfish design workflow (after Google's EGM plugin): `/brainstorm` (design talk, no code), `/draft` (design doc saved as a page), `/goldfish` (fresh context-free "goldfish" reviewers: comprehension check, antagonistic review, implementation-readiness go/no-go).
 - Embedded terminal (PTY + xterm.js) per chat.
 - Pages: rich project documents with embedded media, versions, numbered list, Files/Media/Tools/Help panel; Save to page from any message.
 - Skills & memory: always-on skills, living notes with history, one-click managed block in AGENTS.md/CLAUDE.md/GEMINI.md.

@@ -61,7 +61,7 @@ First read the relevant parts of the project. If something essential is unclear,
 		Prompt: `Review the recent changes in this project{what}. Read the diff (git status / git diff) and the code around it. Report only real problems, most serious first: bugs, security issues, broken edge cases, missing tests. For each: where it is, why it is wrong, and the fix. If it's clean, say so. Don't change files unless I ask.`,
 	},
 	{
-		Name: "egm-brainstorm", Usage: "[idea]", Description: "Elephant-Goldfish 1/3: design talk only, no code",
+		Name: "brainstorm", Usage: "[idea]", Description: "Elephant-Goldfish 1/3: design talk only, no code",
 		Prompt: `You are the ELEPHANT: the long-running session that holds this project's architecture, intent and memory. Brainstorm the design with me{idea}.
 
 Rules:
@@ -69,19 +69,19 @@ Rules:
 - First read the project (files, notes, pages) so you know the current system. Don't ask what you can find out yourself.
 - Debate trade-offs. Challenge my assumptions, name alternatives and say which you recommend and why. Ask one question at a time.
 - Keep a running list of decisions made and questions still open.
-- When we agree, say so and suggest /egm-draft.`,
+- When we agree, say so and suggest /draft.`,
 	},
 	{
-		Name: "egm-draft", Usage: "[doc path]", Description: "Elephant-Goldfish 2/3: write the design document",
+		Name: "draft", Usage: "[doc path]", Description: "Elephant-Goldfish 2/3: write the design document",
 		Prompt: `You are the ELEPHANT. Turn what we decided into a design document in Markdown{doc}. Still NO production code.
 
 Sections: Problem; Goals and non-goals; Technical plan; Alternatives considered (and why rejected); Implementation plan listing every file to change or create with the exact functions, data structures and signatures; Test plan; Open questions.
 
 Write it so a reader with zero context could build it without guessing. Show me a draft first and refine it with me; once I approve, save it as a page with write_page (title "Design: <name>"). ` + toolHint + `
-When it is approved, suggest /egm-review.`,
+When it is approved, suggest /goldfish.`,
 	},
 	{
-		Name: "egm-review", Usage: "[page title]", Description: "Elephant-Goldfish 3/3: fresh, context-free reviewers test the design",
+		Name: "goldfish", Usage: "[page title]", Description: "Elephant-Goldfish 3/3: fresh, context-free reviewers test the design",
 		Prompt: `You are the ELEPHANT. Stress-test the design document{doc} with GOLDFISH: reviewers that start with zero context and see only the document, never our conversation. Run each as a fresh subagent / separate fresh session if you can (pass it only the document text). If you cannot start one, play it yourself strictly from the document and say that you did.
 
 1. Comprehension check: one Goldfish explains the architecture and intent back from the document alone. Compare it to what we meant. Any gap means the document is ambiguous: list it.
