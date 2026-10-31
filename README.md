@@ -6,14 +6,9 @@
 
 A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, Gemini, …) from a ChatGPT-style window, with a real terminal inside it, rich saved *pages*, always-on skills and memory the AI must read and keep updated, and tools that let the AI add data by itself. Built with Go, Wails, React, TypeScript, Tailwind and SQLite. Linux first.
 
-![Pages view](docs/assets/pages.png)
-
-> The screenshots in this README were taken from the real front end running against **sample data** in a headless browser, not from a live AI session.
-
 ## Contents
 
 - [Features](#features)
-- [Screenshots](#screenshots)
 - [Download and install](#download-and-install)
   - [Windows](#windows-experimental)
 - [Using it](#using-it)
@@ -35,15 +30,6 @@ A desktop app for talking to your AI coding CLI (Claude Code, Kilo, AGY, Codex, 
 - **Voice.** Dictate text, or record a voice message that is kept as an audio attachment with a transcript. Speech-to-text runs locally (one-click offline setup). Nothing is auto-sent.
 - **Safe by default.** Writes to your project show a diff, need confirmation, are backed up and logged. Secret-looking files are kept out of context, previews and media. Skills and repo text are treated as untrusted. See [docs/SECURITY.md](docs/SECURITY.md).
 - **More under the sidebar's “…” menu:** project overview, Fresh Start wizard, context package export, media library, agent compatibility, session history.
-
-## Screenshots
-
-| | |
-| --- | --- |
-| ![Chat with terminal](docs/assets/chat-terminal.png) | ![Skills and memory](docs/assets/skills-memory.png) |
-| **Chat + embedded terminal.** Attachments inline, *Terminal / Chat reply* switch, voice-message and dictation buttons. | **Skills & memory.** Always-on skills, install into `AGENTS.md`, what the AI can do by itself. |
-| ![Page composer](docs/assets/page-composer.png) | ![Settings and voice](docs/assets/settings-voice.png) |
-| **Add data to a page** with text, images, video, audio or a voice message. | **Settings → Voice.** Recorder, offline speech engine, model, custom command. |
 
 ## Download and install
 
