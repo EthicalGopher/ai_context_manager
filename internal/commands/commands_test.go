@@ -27,3 +27,15 @@ func TestExpand(t *testing.T) {
 		}
 	}
 }
+
+func TestEGMCommands(t *testing.T) {
+	for _, in := range []string{"/egm-brainstorm", "/egm-brainstorm a cache", "/egm-draft", "/egm-draft docs/x", "/egm-review", "/egm-review Design: x"} {
+		p, c, ok := Expand(in)
+		if !ok || !strings.HasPrefix(c.Name, "egm-") || strings.Contains(p, "{") && !strings.Contains(p, "'<json>'") {
+			t.Fatalf("%q: ok=%v prompt=%q", in, ok, p)
+		}
+	}
+	if p, _, _ := Expand("/egm-brainstorm a cache"); !strings.Contains(p, "starting from: a cache") {
+		t.Fatal("idea not substituted")
+	}
+}
