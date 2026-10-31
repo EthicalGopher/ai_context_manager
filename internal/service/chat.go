@@ -217,13 +217,26 @@ func (s *Service) SendMessage(o SendOptions) (*SendResult, error) {
 	for _, m := range msg.Media {
 		fmt.Fprintf(&b, "\n[attached %s: %s]", m.Kind, m.Stored)
 	}
-	if err := s.term.Write(tid, []byte("\x1b[200~"+strings.TrimSpace(b.String())+"\x1b[201~")); err != nil {
+	body := strings.TrimSpace(b.String())
+	if err := s.term.Write(tid, []byte("\x1b[200~"+body+"\x1b[201~")); err != nil {
 		res.Note = "Saved, but delivery failed: " + err.Error()
 		return res, nil
 	}
-	time.AfterFunc(80*time.Millisecond, func() { s.term.Write(tid, []byte("\r")) })
+	time.AfterFunc(submitDelay(len(body)), func() { s.term.Write(tid, []byte("\r")) })
 	res.Sent = true
 	return res, nil
+}
+
+// submitDelay is how long to wait after a paste before pressing Enter. The
+// agent TUI processes a paste asynchronously, so an Enter that arrives while a
+// long paste (an expanded command) is still being handled is lost and the
+// message is never submitted. The wait grows with the paste size.
+func submitDelay(n int) time.Duration {
+	d := 150*time.Millisecond + time.Duration(n/20)*time.Millisecond
+	if d > 2*time.Second {
+		d = 2 * time.Second
+	}
+	return d
 }
 
 // ImportMediaData stores pasted data (for example a clipboard image).
