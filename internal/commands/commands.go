@@ -61,39 +61,26 @@ First read the relevant parts of the project. If something essential is unclear,
 		Prompt: `Review the recent changes in this project{what}. Read the diff (git status / git diff) and the code around it. Report only real problems, most serious first: bugs, security issues, broken edge cases, missing tests. For each: where it is, why it is wrong, and the fix. If it's clean, say so. Don't change files unless I ask.`,
 	},
 	{
-		Name: "brainstorm", Usage: "[idea]", Description: "Elephant-Goldfish 1/3: design talk only, no code",
-		Prompt: `You are the ELEPHANT: the long-running session that holds this project's architecture, intent and memory. Brainstorm the design with me{idea}.
+		Name: "design", Usage: "[idea]", Description: "Design before code: brainstorm with you, write the design doc, then fresh reviewers test it",
+		Prompt: `You are the ELEPHANT: the long-running session that holds this project's architecture, intent and memory. Take this from idea to a reviewed design document{idea}. NO production code at any point: do not create or edit project files, only talk design and write the design page.
 
-Rules:
-- NO CODE. Do not create or edit any file and do not write code snippets. We only talk design.
+Phase 1, brainstorm with me:
 - First read the project (files, notes, pages) so you know the current system. Don't ask what you can find out yourself.
-- Debate trade-offs. Challenge my assumptions, name alternatives and say which you recommend and why. Ask one question at a time.
-- Keep a running list of decisions made and questions still open.
-- When we agree, say so and suggest /draft.`,
-	},
-	{
-		Name: "draft", Usage: "[doc path]", Description: "Elephant-Goldfish 2/3: write the design document",
-		Prompt: `You are the ELEPHANT. Turn what we decided into a design document in Markdown{doc}. Still NO production code.
+- Challenge my assumptions, name alternatives and say which you recommend and why.
+- Each reply: your view, then exactly ONE question with 2-4 options and your recommendation (use your interactive question tool if you have one). Keep a short list of decisions made.
+- When the decisions are settled, ask me: "Ready to draft?" and wait for my yes.
 
-Sections: Problem; Goals and non-goals; Technical plan; Alternatives considered (and why rejected); Implementation plan listing every file to change or create with the exact functions, data structures and signatures; Test plan; Open questions.
+Phase 2, draft:
+- Write the design document in Markdown. Sections: Problem; Goals and non-goals; Technical plan; Alternatives considered (and why rejected); Implementation plan listing every file to change or create with the exact functions, data structures and signatures; Test plan; Open questions. A reader with zero context must be able to build it without guessing.
+- Show it to me and refine it. Once I approve, save it as a page with write_page (title "Design: <name>"). ` + toolHint + ` Then continue to phase 3 without asking.
 
-Write it so a reader with zero context could build it without guessing. Show me a draft first and refine it with me; once I approve, save it as a page with write_page (title "Design: <name>"). ` + toolHint + `
-When it is approved, suggest /goldfish.`,
-	},
-	{
-		Name: "goldfish", Usage: "[page title]", Description: "Elephant-Goldfish 3/3: fresh, context-free reviewers test the design",
-		Prompt: `You are the ELEPHANT. Stress-test the design document{doc} with GOLDFISH: reviewers that start with zero context and see only the document, never our conversation. Run each as a fresh subagent / separate fresh session if you can (pass it only the document text). If you cannot start one, play it yourself strictly from the document and say that you did.
+Phase 3, Goldfish review: reviewers that start with zero context and see only the document, never our conversation. Run each as a fresh subagent if you can (pass only the document text); if you cannot, play it yourself strictly from the document and say so.
+1. Comprehension check: one Goldfish explains the architecture and intent back from the document alone. Compare it to what we meant; any gap is an ambiguity to list.
+2. Antagonistic review: 2-3 Goldfish, each a sceptic with a different angle (edge cases and failure modes; hidden dependencies and integration; security and logic gaps).
+3. Implementation readiness: a Goldfish answers go / no-go on whether paths, data structures and signatures are all present and unambiguous.
+Then hold a real conversation with them, in rounds (at most 3): answer every critique by fixing the document or explaining why the point is wrong, update the saved page, and send each Goldfish your replies and the revised document, continuing the SAME Goldfish (message the subagent you already started, e.g. with SendMessage) instead of starting a new one. Each answers: accepted, or still objecting and why. Stop when all accept or after 3 rounds.
 
-1. Comprehension check: one Goldfish explains the architecture and intent back from the document alone. Compare it to what we meant. Any gap means the document is ambiguous: list it.
-2. Antagonistic review: 2-3 Goldfish, each a sceptic with a different angle (edge cases and failure modes; hidden dependencies and integration; security and logic gaps). They only critique.
-3. Implementation readiness: a final Goldfish answers go / no-go: are file paths, data structures and function signatures all present and unambiguous?
-
-Then hold a real conversation with them, in rounds (at most 3):
-- As the Elephant, answer every critique: fix the document, or reply with why the point is wrong. Update the saved page.
-- Send each Goldfish your replies and the revised document, continuing the SAME Goldfish (message the subagent you already started, e.g. with SendMessage) instead of starting a new one. They still see only the document and your replies, never our chat. If you cannot continue one, start a new one with the document plus the earlier critique and your reply.
-- Each Goldfish answers: accepted, or still objecting and why. Stop when all accept or after 3 rounds.
-
-Report: for each Goldfish, its findings and final stance; what changed in the document; what remains open; and the go / no-go verdict. Do not write production code. ` + toolHint,
+Finish with a report: each Goldfish's findings and final stance, what changed in the document, what remains open, and the go / no-go verdict. Do not implement anything until I say so.`,
 	},
 }
 

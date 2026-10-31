@@ -28,21 +28,20 @@ func TestExpand(t *testing.T) {
 	}
 }
 
-func TestEGMCommands(t *testing.T) {
-	for _, in := range []string{"/brainstorm", "/brainstorm a cache", "/draft", "/draft docs/x", "/goldfish", "/goldfish Design: x"} {
+func TestDesignCommand(t *testing.T) {
+	for _, in := range []string{"/design", "/design a cache"} {
 		p, c, ok := Expand(in)
-		if !ok || c.Name == "" || strings.Contains(p, "{") && !strings.Contains(p, "'<json>'") {
+		if !ok || c.Name != "design" || strings.Contains(p, "{") && !strings.Contains(p, "'<json>'") {
 			t.Fatalf("%q: ok=%v prompt=%q", in, ok, p)
 		}
 	}
-	if p, _, _ := Expand("/brainstorm a cache"); !strings.Contains(p, "starting from: a cache") {
-		t.Fatal("idea not substituted")
+	p, _, _ := Expand("/design a cache")
+	if !strings.Contains(p, "starting from: a cache") || !strings.Contains(p, "SAME Goldfish") || !strings.Contains(p, "3 rounds") {
+		t.Fatalf("design prompt incomplete: %q", p)
 	}
-}
-
-func TestGoldfishHoldsRounds(t *testing.T) {
-	p, _, ok := Expand("/goldfish")
-	if !ok || !strings.Contains(p, "SAME Goldfish") || !strings.Contains(p, "3 rounds") || strings.Contains(p, "{") {
-		t.Fatalf("%v %q", ok, p)
+	for _, old := range []string{"/brainstorm", "/draft", "/goldfish"} {
+		if _, _, ok := Expand(old); ok {
+			t.Fatalf("%s should be gone", old)
+		}
 	}
 }

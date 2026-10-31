@@ -63,7 +63,7 @@ For any non-trivial change (new feature, refactor, new module, changed data mode
 3. **Goldfish review**: give only the document (never the conversation) to fresh, zero-context reviewers: a comprehension check, 2-3 skeptical reviewers, and an implementation-readiness go/no-go. Resolve every critique in the document.
 4. Implement only after a "go" and the user's approval.
 
-Skip this for small fixes, typos and one-line changes. The user can run the steps with /brainstorm, /draft and /goldfish.
+Skip this for small fixes, typos and one-line changes. The user can run the whole flow with /design.
 `,
 		},
 		{
