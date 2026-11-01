@@ -1,3 +1,4 @@
+import { MediaViewer } from '../components/MediaViewer'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiFilm, FiImage, FiMusic, FiFileText, FiFile, FiUploadCloud, FiTrash2, FiCopy } from 'react-icons/fi'
 import { api, errMsg, fmtTime } from '../lib/api'
@@ -117,8 +118,7 @@ function Viewer({ item, onClose, onDelete, setError }: { item: Item; onClose: ()
     </>}>
       <div className="grid gap-4 md:grid-cols-[1fr_16rem]">
         <div className="flex min-h-[16rem] items-center justify-center overflow-hidden rounded-lg border border-line bg-bg">
-          {item.kind === 'image' && <img src={url(item.id)} alt={item.name} className="max-h-[60vh] max-w-full object-contain" />}
-          {item.kind === 'video' && <video src={url(item.id)} controls className="max-h-[60vh] max-w-full" />}
+          {(item.kind === 'image' || item.kind === 'video') && <div className="w-full"><MediaViewer kind={item.kind} src={url(item.id)} caption="" /></div>}
           {item.kind === 'audio' && <audio src={url(item.id)} controls className="w-full p-6" />}
           {(item.kind === 'pdf' || item.kind === 'file') && <div className="p-8 text-center text-mute"><div className="mb-2 text-5xl text-accent"><KindIcon kind={item.kind} /></div><p>No inline preview for this type.</p><p className="text-xs">Use “Copy file path” to open it with another app or give it to an agent.</p></div>}
         </div>

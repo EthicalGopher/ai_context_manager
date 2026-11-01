@@ -1,0 +1,36 @@
+/* Styles for lib/mediaViewer.js. Uses the app's colour tokens (space-separated RGB) with fallbacks,
+ * so the same file also styles the exported HTML page. */
+.mv { --mv-accent: rgb(var(--accent, 77 94 224)); position: relative; display: flex; flex-direction: column; margin: 1.5rem 0; overflow: hidden; border-radius: 1rem; border: 1px solid rgb(var(--line, 44 44 51)); background: #000; color: #f4f4f7; outline-offset: 2px; user-select: none; }
+.mv-stage { position: relative; flex: 1 1 auto; height: min(34rem, 70vh); overflow: hidden; touch-action: none; cursor: default; background: #000; }
+.mv-stage.mv-zoomed { cursor: grab; }
+.mv-stage.mv-zoomed:active { cursor: grabbing; }
+.mv-layer { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; backface-visibility: hidden; }
+.mv-media { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; -webkit-user-drag: none; }
+.mv-full { border-radius: 0; border: 0; margin: 0; }
+.mv-full .mv-stage { height: auto; }
+.mv-caption { position: absolute; left: .75rem; bottom: .75rem; max-width: 70%; padding: .2rem .5rem; border-radius: .4rem; background: rgb(0 0 0 / .7); font-size: 11px; font-weight: 600; pointer-events: none; }
+.mv-playing .mv-caption { opacity: 0; transition: opacity .3s; }
+.mv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem .75rem; background: #16161b; }
+.mv-btn { min-width: 2rem; height: 2rem; padding: 0 .5rem; border-radius: .5rem; border: 0; background: transparent; color: inherit; font-size: 14px; cursor: pointer; }
+.mv-btn:hover { background: rgb(255 255 255 / .12); }
+.mv-zoomval { min-width: 3.4rem; font-size: 12px; font-variant-numeric: tabular-nums; }
+.mv-group { display: inline-flex; align-items: center; }
+.mv-time { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; color: #c9c9d2; }
+.mv-speed { height: 2rem; border-radius: .5rem; border: 1px solid #34343c; background: #0e0e12; color: inherit; font-size: 12px; padding: 0 .25rem; }
+.mv input[type=range] { -webkit-appearance: none; appearance: none; height: 1.25rem; background: transparent; cursor: pointer; margin: 0; }
+.mv .mv-seek { flex: 1 1 10rem; min-width: 6rem; }
+.mv .mv-vol { width: 5rem; }
+.mv input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--mv-accent) var(--mv-played, 0%), rgb(255 255 255 / .38) var(--mv-played, 0%), rgb(255 255 255 / .38) var(--mv-buf, 0%), rgb(255 255 255 / .16) var(--mv-buf, 0%)); }
+.mv input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; border: 0; }
+.mv input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: rgb(255 255 255 / .2); }
+.mv input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--mv-accent); }
+.mv input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
+.mv .mv-vol::-webkit-slider-runnable-track { background: rgb(255 255 255 / .3); }
+.mv-tools { position: absolute; top: .5rem; right: .5rem; display: flex; align-items: center; gap: .1rem; padding: .15rem; border-radius: .6rem; background: rgb(0 0 0 / .65); opacity: 0; transition: opacity .15s; }
+.mv:hover .mv-tools, .mv:focus-within .mv-tools { opacity: 1; }
+.mv-spin { display: none; position: absolute; left: 50%; top: 50%; width: 2.5rem; height: 2.5rem; margin: -1.25rem 0 0 -1.25rem; border-radius: 50%; border: 3px solid rgb(255 255 255 / .25); border-top-color: #fff; animation: mv-rot .8s linear infinite; pointer-events: none; }
+.mv-wait .mv-spin { display: block; }
+.mv-msg { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; padding: 1.5rem; text-align: center; font-size: 13px; background: rgb(0 0 0 / .8); }
+.mv-failed .mv-msg { display: flex; }
+@keyframes mv-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mv-spin { animation: none; } }

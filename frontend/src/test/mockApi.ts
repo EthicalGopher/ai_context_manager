@@ -53,6 +53,7 @@ export const apiMock = {
   TermStart: vi.fn(),
   ListPages: vi.fn(),
   SavePage: vi.fn(),
+  ExportPageHTML: vi.fn(),
   SaveMessageToPage: vi.fn(),
   PageVersions: vi.fn(),
   DeletePage: vi.fn(),

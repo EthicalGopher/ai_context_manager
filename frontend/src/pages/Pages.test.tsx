@@ -35,7 +35,7 @@ describe('Pages view', () => {
     expect(screen.getByText('Keep the pink nose.')).toBeInTheDocument()
     expect(screen.getByText('written by agent')).toBeInTheDocument()
     expect(await screen.findByAltText('Selected visual reference')).toHaveAttribute('src', '/media/4')
-    expect(screen.getByText('Selected visual reference', { selector: 'figcaption' })).toBeInTheDocument()
+    expect(screen.getByText('Selected visual reference', { selector: '.mv-caption' })).toBeInTheDocument()
     expect(document.querySelector('video')).toHaveAttribute('src', '/media/5')
     expect(screen.getByText('Callout text').closest('blockquote')).not.toBeNull()
   })

@@ -1,19 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FiEdit2, FiClock, FiTrash2, FiPlus, FiEye, FiImage } from 'react-icons/fi'
+import { FiEdit2, FiClock, FiTrash2, FiPlus, FiEye, FiImage, FiDownload } from 'react-icons/fi'
 import { api, errMsg, fmtTime } from '../lib/api'
 import { useWorkspace } from '../lib/hooks'
 import { MediaCatalog, RichMarkdown, type MediaInfo } from '../components/RichMarkdown'
 import { ToolPanel } from '../components/ToolPanel'
 import { Badge, Button, Confirm, DiffView, ErrorBox, Modal } from '../components/ui'
 import { Composer } from '../components/Composer'
+import { buildPageExport } from '../lib/exportPage'
 
 export interface PageT { id: number; workspaceId: number; title: string; summary: string; body: string; sort: number; updatedAt: string; updatedBy: string }
 
 export const usePages = () => {
   const ws = useWorkspace()
   const [pages, setPages] = useState<PageT[]>([])
-  const reload = useCallback(async () => { if (ws) setPages(((await api.ListPages(ws.id)) as any) ?? []) }, [ws?.id])
+  const seen = useRef('')
+  // Only replace state when the pages really changed, so the 4 s poll doesn't re-render (and stutter) playing media.
+  const reload = useCallback(async () => {
+    if (!ws) return
+    const next: PageT[] = ((await api.ListPages(ws.id)) as any) ?? []
+    const sig = JSON.stringify(next)
+    if (sig !== seen.current) { seen.current = sig; setPages(next) }
+  }, [ws?.id])
   useEffect(() => { reload(); const t = setInterval(() => { if (!document.hidden) reload() }, 4000); return () => clearInterval(t) }, [reload])
   return { pages, reload }
 }
@@ -29,7 +37,15 @@ export default function PagesView() {
   const [draft, setDraft] = useState({ title: '', summary: '', body: '' })
   const [hist, setHist] = useState<any[] | null>(null)
   const [del, setDel] = useState(false)
-  const loadMedia = useCallback(async () => { if (ws) setMedia(((await api.ListMedia(ws.id)) as any) ?? []) }, [ws?.id])
+  const mediaSeen = useRef('')
+  const [notice, setNotice] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const loadMedia = useCallback(async () => {
+    if (!ws) return
+    const next: MediaInfo[] = ((await api.ListMedia(ws.id)) as any) ?? []
+    const sig = JSON.stringify(next)
+    if (sig !== mediaSeen.current) { mediaSeen.current = sig; setMedia(next) }
+  }, [ws?.id])
   useEffect(() => { loadMedia(); const t = setInterval(() => { if (!document.hidden) loadMedia() }, 5000); return () => clearInterval(t) }, [loadMedia])
 
   const page = pages.find((p) => String(p.id) === id) ?? (id ? undefined : pages[0])
@@ -51,12 +67,21 @@ export default function PagesView() {
       await reload(); setEdit(false)
     } catch (e) { setError(errMsg(e)) }
   }
+  const exportHtml = async () => {
+    if (!page) return
+    setExporting(true); setNotice('')
+    try {
+      const dest = await api.ExportPageHTML(page.id, buildPageExport(page, catalog) as any)
+      if (dest) setNotice(`Saved to ${dest}. It is one file with the media inside, so you can send it to anyone and it opens in any browser.`)
+    } catch (e) { setError(errMsg(e)) } finally { setExporting(false) }
+  }
   const insert = (m: MediaInfo) => setDraft((d) => ({ ...d, body: d.body.replace(/\s*$/, '') + `\n\n![${m.name}](media:${m.id})\n` }))
 
   return (
     <div className="flex h-full min-w-0">
       <section className="min-w-0 flex-1 overflow-auto" aria-label="Page">
         {error && <div className="p-4"><ErrorBox error={error} onDismiss={() => setError('')} /></div>}
+        {notice && <p role="status" className="mx-auto mt-4 max-w-4xl px-8 text-sm text-ok">{notice}</p>}
         {!page ? (
           <div className="mx-auto flex h-full max-w-xl flex-col items-center justify-center gap-4 px-6 text-center">
             <h1 className="text-3xl font-bold">No pages yet</h1>
@@ -76,6 +101,7 @@ export default function PagesView() {
               <div className="mt-6 flex flex-wrap gap-2">
                 <Button onClick={() => setEdit(true)}><FiEdit2 aria-hidden /> Edit</Button>
                 <Button onClick={async () => setHist(((await api.PageVersions(page.id)) as any) ?? [])}><FiClock aria-hidden /> History</Button>
+                <Button onClick={exportHtml} disabled={exporting} title="Save this page as one HTML file you can send to friends"><FiDownload aria-hidden /> {exporting ? 'Preparing…' : 'Download HTML'}</Button>
                 <Button variant="ghost" onClick={() => setDel(true)}><FiTrash2 aria-hidden /> Delete</Button>
               </div>
               <div className="mt-6">

@@ -1031,6 +1031,7 @@ func (s *Service) MediaHandler() http.Handler {
 		st, _ := f.Stat()
 		w.Header().Set("Content-Type", m.Mime)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, max-age=86400") // stored files never change under the same id; lets video re-seek without re-reading
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox")
 		disp := "inline"
 		if m.Kind == "file" {
