@@ -1,26 +1,79 @@
 package service
 
 import (
-	"bufio"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"aicw/internal/markdown"
 	"aicw/internal/media"
+	"aicw/internal/pagehtml"
 	"aicw/internal/safety"
 	"aicw/internal/storage"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// pageExport renders a page for sharing: one self-contained .html file, or a
+// .zip (index.html + media/) when its media is too big to embed.
+func (s *Service) pageExport(pageID int64) (name string, write func(io.Writer) error, err error) {
+	p, err := s.Store.Page(pageID)
+	if err != nil {
+		return "", nil, errors.New("page not found")
+	}
+	root := filepath.Join(s.DataDir, "media")
+	plan, err := pagehtml.New(p.Title, p.Summary, p.Body, func(id int64) (pagehtml.Media, bool) {
+		m, err := s.Store.Media(id)
+		if err != nil || m.WorkspaceID != p.WorkspaceID || !safety.Contains(root, m.Stored) {
+			return pagehtml.Media{}, false
+		}
+		return pagehtml.Media{ID: m.ID, Name: m.Name, Kind: m.Kind, Mime: m.Mime, Path: m.Stored, Size: m.Size}, true
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	base := strings.Trim(media.SafeName(p.Title), " .")
+	if base == "" {
+		base = "page"
+	}
+	if plan.NeedZ {
+		return base + ".zip", plan.WriteZip, nil
+	}
+	doc, err := plan.HTML(true)
+	if err != nil {
+		return "", nil, err
+	}
+	return base + ".html", func(w io.Writer) error { _, err := io.WriteString(w, doc); return err }, nil
+}
+
+// ExportPage asks where to save and writes the page as a file to send to
+// friends. It returns the saved path (empty if cancelled).
+func (s *Service) ExportPage(pageID int64) (string, error) {
+	name, write, err := s.pageExport(pageID)
+	if err != nil {
+		return "", err
+	}
+	if s.ctx == nil {
+		return "", errors.New("no window")
+	}
+	dest, err := runtime.SaveFileDialog(s.ctx, runtime.SaveDialogOptions{Title: "Save page to share", DefaultFilename: name})
+	if err != nil || dest == "" {
+		return "", err
+	}
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return "", err
+	}
+	if err := write(f); err != nil {
+		f.Close()
+		return "", err
+	}
+	return dest, f.Close()
+}
 
 func (s *Service) ListPages(wsID int64) ([]storage.Page, error) { return s.Store.Pages(wsID) }
 
@@ -205,98 +258,4 @@ func (s *Service) AddToPage(pageID int64, text string, mediaIDs []int64) (*stora
 		return nil, errors.New("write something or attach a file")
 	}
 	return s.Store.AppendToPage(p.WorkspaceID, p.Title, md, "user")
-}
-
-// PageExport is what the front end renders for a shareable HTML copy of a
-// page: the body markup (media referenced as "/media/<id>"), the stylesheet and
-// the viewer script. The backend embeds the media and writes one file.
-type PageExport struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
-	CSS   string `json:"css"`
-	JS    string `json:"js"`
-}
-
-// maxExportMedia caps the raw media embedded in one shareable HTML file.
-const maxExportMedia = 200 << 20
-
-var exportMediaRef = regexp.MustCompile(`="/media/(\d+)"`)
-
-// ExportPageHTML asks where to save and writes the page as one self-contained
-// .html file (media embedded) that can be sent to anyone.
-func (s *Service) ExportPageHTML(id int64, x PageExport) (string, error) {
-	p, err := s.Store.Page(id)
-	if err != nil {
-		return "", err
-	}
-	if s.ctx == nil {
-		return "", errors.New("no window")
-	}
-	name := strings.TrimSuffix(media.SafeName(p.Title), ".") + ".html"
-	dest, err := runtime.SaveFileDialog(s.ctx, runtime.SaveDialogOptions{Title: "Download page as HTML", DefaultFilename: name})
-	if err != nil || dest == "" {
-		return "", err
-	}
-	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
-	if err != nil {
-		return "", err
-	}
-	if err := s.writePageHTML(f, p, x); err != nil {
-		f.Close()
-		os.Remove(dest)
-		return "", err
-	}
-	return dest, f.Close()
-}
-
-func (s *Service) writePageHTML(w io.Writer, p *storage.Page, x PageExport) error {
-	if len(x.Body) > 8<<20 || len(x.CSS) > 256<<10 || len(x.JS) > 256<<10 {
-		return errors.New("page export is too large")
-	}
-	refs := exportMediaRef.FindAllStringSubmatchIndex(x.Body, -1)
-	files := make([]*storage.Media, len(refs))
-	var total int64
-	for i, r := range refs {
-		mid, _ := strconv.ParseInt(x.Body[r[2]:r[3]], 10, 64)
-		m, err := s.Store.Media(mid)
-		if err != nil || m.WorkspaceID != p.WorkspaceID || !safety.Contains(filepath.Join(s.DataDir, "media"), m.Stored) {
-			continue // deleted or foreign media: leave an empty source
-		}
-		files[i] = m
-		total += m.Size
-	}
-	if total > maxExportMedia {
-		return fmt.Errorf("the media on this page is %d MB; a single HTML file can embed at most %d MB. Remove or shorten some videos and try again", total>>20, maxExportMedia>>20)
-	}
-	bw := bufio.NewWriterSize(w, 1<<20)
-	fmt.Fprintf(bw, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`+
-		`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; media-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src data: blob:">`+
-		`<title>%s</title><style>%s</style></head><body>`, html.EscapeString(p.Title), strings.ReplaceAll(x.CSS, "</style", `<\/style`))
-	last := 0
-	for i, r := range refs {
-		bw.WriteString(x.Body[last:r[0]])
-		last = r[1]
-		m := files[i]
-		if m == nil {
-			bw.WriteString(`=""`)
-			continue
-		}
-		f, err := os.Open(m.Stored)
-		if err != nil {
-			bw.WriteString(`=""`)
-			continue
-		}
-		fmt.Fprintf(bw, `="data:%s;base64,`, html.EscapeString(m.Mime))
-		enc := base64.NewEncoder(base64.StdEncoding, bw)
-		_, cerr := io.Copy(enc, f)
-		f.Close()
-		if cerr != nil {
-			return cerr
-		}
-		enc.Close()
-		bw.WriteString(`"`)
-	}
-	bw.WriteString(x.Body[last:])
-	fmt.Fprintf(bw, `<script>%s</script></body></html>`, strings.ReplaceAll(x.JS, "</script", `<\/script`))
-	return bw.Flush()
 }

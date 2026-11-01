@@ -59,7 +59,7 @@ export function Doctor():Promise<string>;
 
 export function ExportContext(arg1:service.ContextRequest):Promise<string>;
 
-export function ExportPageHTML(arg1:number,arg2:service.PageExport):Promise<string>;
+export function ExportPage(arg1:number):Promise<string>;
 
 export function ForgetWorkspace(arg1:number,arg2:boolean):Promise<void>;
 

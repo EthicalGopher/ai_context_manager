@@ -754,24 +754,6 @@ export namespace service {
 	        this.nextSteps = source["nextSteps"];
 	    }
 	}
-	export class PageExport {
-	    title: string;
-	    body: string;
-	    css: string;
-	    js: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageExport(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.title = source["title"];
-	        this.body = source["body"];
-	        this.css = source["css"];
-	        this.js = source["js"];
-	    }
-	}
 	export class FileEntry {
 	    name: string;
 	    rel: string;

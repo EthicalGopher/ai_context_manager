@@ -6,7 +6,7 @@ Product pivot to a ChatGPT-style app.
 
 - Chat with your AI CLI: replies posted as messages (Claude Code, Kilo, AGY), queue + Stop, edits opt-in; attachments (images, audio, video, PDFs) by picker, drop or paste.
 - Elephant-Goldfish design workflow (after Google's EGM plugin) as one command, `/design`: brainstorm with you (no code), write the design doc as a page, then fresh context-free "goldfish" reviewers test it in rounds with the elephant and give a go/no-go.
-- Pages: **Download HTML** saves a page as one self-contained file (media embedded, light/dark) to send to friends; images and videos open in a new viewer with smooth seeking, speed, volume, fullscreen and zoom/pan (buttons, +/-/0, Ctrl+scroll, pinch, drag).
+- Text size control (A−/A+, Ctrl +/−/0, Ctrl+scroll) for the whole app, including the terminal.
 - Embedded terminal (PTY + xterm.js) per chat.
 - Pages: rich project documents with embedded media, versions, numbered list, Files/Media/Tools/Help panel; Save to page from any message.
 - Skills & memory: always-on skills, living notes with history, one-click managed block in AGENTS.md/CLAUDE.md/GEMINI.md.

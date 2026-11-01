@@ -8,7 +8,6 @@ import { ToolPanel } from '../components/ToolPanel'
 import { Badge, Button, Confirm, DiffView, ErrorBox, Modal } from '../components/ui'
 import { Composer } from '../components/Composer'
 import { TextSize } from '../components/TextSize'
-import { buildPageExport } from '../lib/exportPage'
 
 export interface PageT { id: number; workspaceId: number; title: string; summary: string; body: string; sort: number; updatedAt: string; updatedBy: string }
 
@@ -38,9 +37,8 @@ export default function PagesView() {
   const [draft, setDraft] = useState({ title: '', summary: '', body: '' })
   const [hist, setHist] = useState<any[] | null>(null)
   const [del, setDel] = useState(false)
+  const [saved, setSaved] = useState('')
   const mediaSeen = useRef('')
-  const [notice, setNotice] = useState('')
-  const [exporting, setExporting] = useState(false)
   const loadMedia = useCallback(async () => {
     if (!ws) return
     const next: MediaInfo[] = ((await api.ListMedia(ws.id)) as any) ?? []
@@ -68,13 +66,12 @@ export default function PagesView() {
       await reload(); setEdit(false)
     } catch (e) { setError(errMsg(e)) }
   }
-  const exportHtml = async () => {
+  const exportPage = async () => {
     if (!page) return
-    setExporting(true); setNotice('')
     try {
-      const dest = await api.ExportPageHTML(page.id, buildPageExport(page, catalog) as any)
-      if (dest) setNotice(`Saved to ${dest}. It is one file with the media inside, so you can send it to anyone and it opens in any browser.`)
-    } catch (e) { setError(errMsg(e)) } finally { setExporting(false) }
+      const dest = (await api.ExportPage(page.id)) as unknown as string
+      if (dest) setSaved(dest)
+    } catch (e) { setError(errMsg(e)) }
   }
   const insert = (m: MediaInfo) => setDraft((d) => ({ ...d, body: d.body.replace(/\s*$/, '') + `\n\n![${m.name}](media:${m.id})\n` }))
 
@@ -82,7 +79,6 @@ export default function PagesView() {
     <div className="flex h-full min-w-0">
       <section className="min-w-0 flex-1 overflow-auto" aria-label="Page">
         {error && <div className="p-4"><ErrorBox error={error} onDismiss={() => setError('')} /></div>}
-        {notice && <p role="status" className="mx-auto mt-4 max-w-4xl px-8 text-sm text-ok">{notice}</p>}
         {!page ? (
           <div className="mx-auto flex h-full max-w-xl flex-col items-center justify-center gap-4 px-6 text-center">
             <h1 className="text-3xl font-bold">No pages yet</h1>
@@ -96,13 +92,13 @@ export default function PagesView() {
               <span className="flex items-center gap-2"><TextSize /><Badge tone={page.updatedBy === 'agent' ? 'accent' : 'neutral'}>{page.updatedBy === 'agent' ? 'written by agent' : 'written by you'}</Badge><span>Updated {fmtTime(page.updatedAt)}</span></span>
             </header>
             {!edit ? (<>
-              <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-[0.2em] text-mute">Page / {String(idx + 1).padStart(2, '0')}</p>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-mute">Page / {String(idx + 1).padStart(2, '0')}</p>
               <h1 className="text-5xl font-extrabold leading-tight">{page.title}</h1>
               {page.summary && <p className="mt-3 max-w-2xl text-lg text-mute">{page.summary}</p>}
               <div className="mt-6 flex flex-wrap gap-2">
                 <Button onClick={() => setEdit(true)}><FiEdit2 aria-hidden /> Edit</Button>
                 <Button onClick={async () => setHist(((await api.PageVersions(page.id)) as any) ?? [])}><FiClock aria-hidden /> History</Button>
-                <Button onClick={exportHtml} disabled={exporting} title="Save this page as one HTML file you can send to friends"><FiDownload aria-hidden /> {exporting ? 'Preparing…' : 'Download HTML'}</Button>
+                <Button onClick={exportPage}><FiDownload aria-hidden /> Download to share</Button>
                 <Button variant="ghost" onClick={() => setDel(true)}><FiTrash2 aria-hidden /> Delete</Button>
               </div>
               <div className="mt-6">
@@ -135,6 +131,13 @@ export default function PagesView() {
               <li key={v.id}><div className="mb-1 flex items-center justify-between text-xs text-mute"><span>{fmtTime(v.savedAt)} · {v.savedBy}</span>
                 <button className="font-bold text-accent" onClick={() => { setDraft({ title: v.title, summary: v.summary, body: v.body }); setEdit(true); setHist(null) }}>Restore into editor</button></div>
                 <DiffView diff={`--- version\n+++ current\n${v.body.split('\n').map((l: string) => '-' + l).join('\n')}\n${page.body.split('\n').map((l: string) => '+' + l).join('\n')}`} /></li>))}</ul>)}
+        </Modal>)}
+      {saved && (
+        <Modal title="Saved to share" onClose={() => setSaved('')}>
+          <p className="text-sm">Saved <code className="break-all">{saved}</code></p>
+          <p className="mt-2 text-sm text-mute">{saved.toLowerCase().endsWith('.zip')
+            ? 'This page has large media, so it was saved as a zip. Send the zip; your friend unzips it and opens index.html (keep the media folder next to it).'
+            : 'This is one self-contained file with all images, video and audio inside. Send it to anyone; it opens in any browser, no app needed.'}</p>
         </Modal>)}
       {del && page && <Confirm title="Delete this page?" danger confirmLabel="Delete" onCancel={() => setDel(false)} onConfirm={async () => { try { await api.DeletePage(page.id, true); setDel(false); await reload(); navigate('/p') } catch (e) { setError(errMsg(e)); setDel(false) } }}><p className="text-sm">Deletes “{page.title}” and its history. Media files in the library are kept.</p></Confirm>}
     </div>

@@ -94,8 +94,8 @@ export function ExportContext(arg1) {
   return window['go']['service']['Service']['ExportContext'](arg1);
 }
 
-export function ExportPageHTML(arg1, arg2) {
-  return window['go']['service']['Service']['ExportPageHTML'](arg1, arg2);
+export function ExportPage(arg1) {
+  return window['go']['service']['Service']['ExportPage'](arg1);
 }
 
 export function ForgetWorkspace(arg1, arg2) {

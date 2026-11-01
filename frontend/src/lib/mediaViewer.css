@@ -34,3 +34,4 @@
 .mv-failed .mv-msg { display: flex; }
 @keyframes mv-rot { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .mv-spin { animation: none; } }
+.mv-download { display: inline-block; margin-top: .6rem; color: #fff; font-weight: 700; text-decoration: underline; }

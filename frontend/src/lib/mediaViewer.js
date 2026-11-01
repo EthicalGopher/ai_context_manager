@@ -45,7 +45,7 @@
     var layer = el('div', 'mv-layer')
     var media = el(kind === 'video' ? 'video' : 'img', 'mv-media')
     if (kind === 'video') {
-      media.preload = 'auto'
+      media.preload = 'metadata' // no big upfront read; the server's Range support buffers on play and seek
       media.setAttribute('playsinline', '')
       media.disablePictureInPicture = false
     } else {
@@ -187,7 +187,12 @@
       ;['playing', 'canplay', 'seeked'].forEach(function (ev) { on(media, ev, function () { root.classList.remove('mv-wait') }) })
       on(media, 'error', function () {
         root.classList.remove('mv-wait')
-        msg.textContent = 'This video cannot be played here (the format or codec may not be supported by this viewer). Try re-encoding it as MP4 (H.264/AAC) or WebM.'
+        msg.textContent = 'This video cannot be played here (the format or codec may not be supported by this viewer). Try MP4 (H.264/AAC) or WebM.'
+        if (/^\/media\//.test(src)) {
+          var dl = el('a', 'mv-download', { href: src + '?download=1', download: caption || 'video' })
+          dl.textContent = 'Download the file'
+          msg.appendChild(document.createElement('br')); msg.appendChild(dl)
+        }
         root.classList.add('mv-failed')
       })
       on(seek, 'input', function () { seeking = true; if (media.duration) media.currentTime = seek.value / 1000 * media.duration; paint() })
@@ -227,6 +232,13 @@
       if (handled) e.preventDefault()
     })
     on(window, 'resize', apply)
+
+    // Pause when scrolled out of view.
+    if (kind === 'video' && window.IntersectionObserver) {
+      var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (!e.isIntersecting && !media.paused && !isFull()) media.pause() }) }, { threshold: 0.1 })
+      io.observe(root)
+      cleanups.push(function () { io.disconnect() })
+    }
 
     // ---- load the source (embedded data: URLs become blobs, which seek smoothly) ----
     var objectUrl = ''
