@@ -4,3 +4,4 @@ frontend/dist
 dist/
 build/bin/
 frontend/node_modules/
+.claude/
