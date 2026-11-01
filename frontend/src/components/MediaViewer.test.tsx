@@ -55,3 +55,15 @@ describe('buildPageExport', () => {
     expect(x.js.trim().endsWith('window.aicwMountAll(document);')).toBe(true)
   })
 })
+
+describe('text size', () => {
+  it('steps the root font size and remembers it', async () => {
+    const { useStore } = await import('../store')
+    useStore.getState().stepText(0)
+    expect(document.documentElement.style.fontSize).toBe('16px')
+    useStore.getState().stepText(1)
+    expect(document.documentElement.style.fontSize).toBe('17.6px')
+    expect(localStorage.getItem('aicw-text-scale')).toBe('1.1')
+    useStore.getState().stepText(0)
+  })
+})

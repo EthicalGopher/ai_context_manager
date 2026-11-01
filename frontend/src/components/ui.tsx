@@ -143,9 +143,9 @@ export function Avatars({ names, max = 4 }: { names: string[]; max?: number }) {
   return (
     <span className="inline-flex -space-x-2" aria-label={names.join(', ')}>
       {names.slice(0, max).map((n, i) => (
-        <span key={n + i} title={n} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-panel text-[10px] font-bold text-white" style={{ background: colors[i % colors.length] }}>{n.slice(0, 1).toUpperCase()}</span>
+        <span key={n + i} title={n} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-panel text-[0.625rem] font-bold text-white" style={{ background: colors[i % colors.length] }}>{n.slice(0, 1).toUpperCase()}</span>
       ))}
-      {names.length > max && <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-panel bg-raised text-[10px] text-mute">+{names.length - max}</span>}
+      {names.length > max && <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-panel bg-raised text-[0.625rem] text-mute">+{names.length - max}</span>}
     </span>
   )
 }

@@ -143,7 +143,7 @@ export function Composer({ wsId, busy, placeholder, onSend, autoFocus, onVoiceHe
             }
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } else if (e.key === 'Escape' && rec === 'recording') cancelRec()
           }}
-          className="block max-h-56 w-full resize-none border-0 bg-transparent px-3 py-2 text-[15px] text-fg shadow-none placeholder:text-mute" />
+          className="block max-h-56 w-full resize-none border-0 bg-transparent px-3 py-2 text-[0.9375rem] text-fg shadow-none placeholder:text-mute" />
         <div className="flex items-center justify-between gap-2 px-1 pt-1">
           <div className="flex min-w-0 items-center gap-1">
             <button aria-label="Attach files" title="Attach images, audio, video, PDFs…" className="rounded-full p-2 text-mute hover:bg-line/60 hover:text-fg" onClick={async () => { try { addPaths((await api.PickMedia()) ?? []) } catch (e) { setError(errMsg(e)) } }}><FiPaperclip aria-hidden /></button>

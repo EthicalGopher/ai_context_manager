@@ -6,6 +6,7 @@ import { useStore, type Conv } from '../store'
 import { useWorkspace } from '../lib/hooks'
 import { Composer, type Attached } from '../components/Composer'
 import { ChatOptions } from '../components/ChatOptions'
+import { TextSize } from '../components/TextSize'
 import { MessageView, type Msg } from '../components/MessageView'
 import { TerminalPane } from '../components/TerminalPane'
 import { Button, Confirm, ErrorBox } from '../components/ui'
@@ -134,6 +135,7 @@ export default function Chat() {
         <header className="flex items-center gap-3 border-b border-line px-5 py-2.5">
           <div className="min-w-0 flex-1"><Title conv={conv} onRename={async (t) => { try { await api.RenameConversation(convId, t); refreshConvs() } catch (e) { setError(errMsg(e)) } }} /></div>
           <div className="flex shrink-0 items-center gap-2">
+            <TextSize />
             {conv && (
               <ChatOptions agent={conv.agent || 'claude'} agents={agents} edits={edits} onError={setError}
                 onAgent={async (id) => { try { await api.SetConversationAgent(conv.id, id); refreshConvs() } catch (x) { setError(errMsg(x)) } }}

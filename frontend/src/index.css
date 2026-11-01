@@ -16,7 +16,7 @@ html { color-scheme: dark; }
 html.light { color-scheme: light; }
 select option { background: rgb(var(--panel)); color: rgb(var(--fg)); }
 html, body, #root { height: 100%; }
-body { @apply bg-bg text-fg font-sans antialiased; font-size: 14.5px; font-weight: 500; }
+body { @apply bg-bg text-fg font-sans antialiased; font-size: 0.90625rem; font-weight: 500; }
 h1, h2, h3 { font-family: 'Urbanist Variable', 'Inter Variable', sans-serif; letter-spacing: -0.005em; font-weight: 700; }
 :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; border-radius: 8px; }
 button:disabled { cursor: not-allowed; opacity: .5; }
@@ -34,7 +34,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: rgb(var
 .card-hover { transition: transform .15s, border-color .15s, background .15s; }
 .card-hover:hover { transform: translateY(-2px); border-color: rgb(var(--accent) / .7); background: rgb(var(--raised)); }
 .seg { background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 10px; padding: 3px; display: inline-flex; gap: 2px; }
-.seg button { border-radius: 8px; padding: 4px 12px; font-size: 13px; color: rgb(var(--mute)); display: inline-flex; gap: 6px; align-items: center; }
+.seg button { border-radius: 8px; padding: 4px 12px; font-size: 0.8125rem; color: rgb(var(--mute)); display: inline-flex; gap: 6px; align-items: center; }
 .seg button[aria-selected='true'] { background: rgb(var(--raised)); color: rgb(var(--fg)); box-shadow: 0 1px 0 rgb(255 255 255 / .05) inset; }
 .diff-add { background: rgb(var(--ok) / .15); }
 .diff-del { background: rgb(var(--bad) / .15); }

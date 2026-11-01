@@ -96,7 +96,7 @@ function Sidebar() {
           <ul>{shownPages.map((p, i) => (
             <li key={p.id} className="group relative">
               <NavLink to={`/p/${p.id}`} className={({ isActive }) => `flex items-center gap-3 truncate rounded-xl px-3 py-2.5 pr-14 ${isActive || (loc.pathname === '/p' && i === 0) ? 'bg-raised text-fg' : 'text-fg/85 hover:bg-raised/70'}`}>
-                <span className="text-[11px] font-bold text-mute">{String(pages.indexOf(p) + 1).padStart(2, '0')}</span><span className="truncate">{p.title}</span></NavLink>
+                <span className="text-[0.6875rem] font-bold text-mute">{String(pages.indexOf(p) + 1).padStart(2, '0')}</span><span className="truncate">{p.title}</span></NavLink>
               <span className="absolute right-1 top-1/2 hidden -translate-y-1/2 gap-0.5 group-hover:flex">
                 <button aria-label={`Move ${p.title} up`} className="rounded p-1 text-mute hover:text-fg" onClick={() => move(pages.indexOf(p), -1)}><FiArrowUp aria-hidden size={13} /></button>
                 <button aria-label={`Move ${p.title} down`} className="rounded p-1 text-mute hover:text-fg" onClick={() => move(pages.indexOf(p), 1)}><FiArrowDown aria-hidden size={13} /></button></span>
@@ -158,6 +158,23 @@ function Shell() {
     }
     navigate(page === 'pages' ? '/p' : page ? '/' + page : '/')
   }
+
+  const stepText = useStore((st) => st.stepText)
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const d = e.key === '+' || e.key === '=' ? 1 : e.key === '-' || e.key === '_' ? -1 : e.key === '0' ? 0 : null
+      if (d === null) return
+      e.preventDefault(); stepText(d)
+    }
+    const wheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.defaultPrevented || e.deltaY === 0) return // a media viewer under the pointer handles its own zoom
+      e.preventDefault(); stepText(e.deltaY < 0 ? 1 : -1)
+    }
+    window.addEventListener('keydown', key)
+    window.addEventListener('wheel', wheel, { passive: false })
+    return () => { window.removeEventListener('keydown', key); window.removeEventListener('wheel', wheel) }
+  }, [stepText])
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light')

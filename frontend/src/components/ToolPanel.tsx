@@ -26,7 +26,7 @@ export function ToolPanel({ wsId, media, onInsert, onMediaChanged }: { wsId: num
       </div>
       <nav aria-label="Panel sections" className="flex w-16 shrink-0 flex-col items-center gap-1 border-l border-line py-3">
         {tabs.map((t) => (
-          <button key={t.id} aria-label={t.label} aria-pressed={tab === t.id} onClick={() => setTab(t.id)} className={`flex w-14 flex-col items-center gap-1 rounded-xl py-2 text-lg ${tab === t.id ? 'bg-raised text-fg' : 'text-mute hover:bg-raised/60 hover:text-fg'}`}>{t.icon}<span className="text-[10px] font-semibold">{t.label}</span></button>))}
+          <button key={t.id} aria-label={t.label} aria-pressed={tab === t.id} onClick={() => setTab(t.id)} className={`flex w-14 flex-col items-center gap-1 rounded-xl py-2 text-lg ${tab === t.id ? 'bg-raised text-fg' : 'text-mute hover:bg-raised/60 hover:text-fg'}`}>{t.icon}<span className="text-[0.625rem] font-semibold">{t.label}</span></button>))}
       </nav>
     </aside>
   )
@@ -105,7 +105,7 @@ function MediaList({ wsId, media, onInsert, onChanged }: { wsId: number; media: 
           <li key={m.id} className="overflow-hidden rounded-xl border border-line bg-bg">
             <div className="aspect-video bg-raised">{m.kind === 'image' ? <img src={`/media/${m.id}`} alt={m.name} loading="lazy" className="h-full w-full object-cover" /> : m.kind === 'video' ? <video src={`/media/${m.id}#t=0.1`} preload="metadata" muted className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-2xl text-mute"><FiFile aria-hidden /></div>}</div>
             <div className="p-2"><div className="truncate text-xs">{m.name}</div>
-              {onInsert ? <button className="mt-1 text-xs font-bold text-accent" onClick={() => onInsert(m)}>Insert into page</button> : <span className="text-[11px] text-mute">id {m.id}</span>}</div>
+              {onInsert ? <button className="mt-1 text-xs font-bold text-accent" onClick={() => onInsert(m)}>Insert into page</button> : <span className="text-[0.6875rem] text-mute">id {m.id}</span>}</div>
           </li>))}
       </ul>
     </div>

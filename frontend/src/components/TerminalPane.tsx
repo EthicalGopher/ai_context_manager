@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { FiPlay, FiTerminal, FiX, FiRotateCw } from 'react-icons/fi'
 import { api, errMsg, onEvent } from '../lib/api'
 import { Button, Spinner } from './ui'
+import { useStore } from '../store'
 
 const b64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
 
@@ -46,10 +47,11 @@ export function TerminalPane({ conv, agents, autoStart, onAgent, onStateChange, 
     } catch (e) { setError(errMsg(e)) } finally { setBusy(false) }
   }
 
+  const live = useRef<{ term: Terminal; doFit: () => void } | null>(null)
   useEffect(() => {
     if (!termId || !host.current) return
     const term = new Terminal({
-      fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace", fontSize: 13, cursorBlink: true, scrollback: 5000, allowProposedApi: true,
+      fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace", fontSize: Math.round(13 * useStore.getState().textScale), cursorBlink: true, scrollback: 5000, allowProposedApi: true,
       theme: { background: '#0e0e11', foreground: '#e6e6ec', cursor: '#8b9cff', selectionBackground: '#33408a' },
     })
     const fit = new FitAddon()
@@ -57,6 +59,7 @@ export function TerminalPane({ conv, agents, autoStart, onAgent, onStateChange, 
     term.open(host.current)
     const doFit = () => { try { fit.fit(); api.TermResize(termId, term.cols, term.rows).catch(() => {}) } catch { /* hidden */ } }
     doFit()
+    live.current = { term, doFit }
     api.TermBuffer(termId).then((s: string) => { if (s) term.write(b64(s)) }).catch(() => {})
     const d = term.onData((data) => { api.TermWrite(termId, data).catch(() => {}) })
     const offData = onEvent('term:data', (p: { id: string; data: string }) => { if (p.id === termId) term.write(b64(p.data)) })
@@ -64,9 +67,18 @@ export function TerminalPane({ conv, agents, autoStart, onAgent, onStateChange, 
     const ro = new ResizeObserver(doFit)
     ro.observe(host.current)
     term.focus()
-    return () => { d.dispose(); offData(); offExit(); ro.disconnect(); term.dispose() }
+    return () => { live.current = null; d.dispose(); offData(); offExit(); ro.disconnect(); term.dispose() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [termId])
+
+  // The terminal follows the app's text size.
+  const textScale = useStore((st) => st.textScale)
+  useEffect(() => {
+    const t = live.current
+    if (!t) return
+    t.term.options.fontSize = Math.round(13 * textScale)
+    t.doFit()
+  }, [textScale])
 
   const agentSel = (
     <select aria-label="Agent for this chat" value={conv.agent || 'claude'} onChange={(e) => onAgent(e.target.value)} className="rounded-lg border border-line bg-bg px-2 py-1.5 text-sm">

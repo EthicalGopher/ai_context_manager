@@ -7,6 +7,7 @@ import { MediaCatalog, RichMarkdown, type MediaInfo } from '../components/RichMa
 import { ToolPanel } from '../components/ToolPanel'
 import { Badge, Button, Confirm, DiffView, ErrorBox, Modal } from '../components/ui'
 import { Composer } from '../components/Composer'
+import { TextSize } from '../components/TextSize'
 import { buildPageExport } from '../lib/exportPage'
 
 export interface PageT { id: number; workspaceId: number; title: string; summary: string; body: string; sort: number; updatedAt: string; updatedBy: string }
@@ -92,10 +93,10 @@ export default function PagesView() {
           <article className="mx-auto max-w-4xl px-8 pb-24 pt-6">
             <header className="mb-8 flex items-center justify-between gap-3 border-b border-line pb-3 text-xs text-mute">
               <span className="uppercase tracking-widest">Project / {ws.name}</span>
-              <span className="flex items-center gap-2"><Badge tone={page.updatedBy === 'agent' ? 'accent' : 'neutral'}>{page.updatedBy === 'agent' ? 'written by agent' : 'written by you'}</Badge><span>Updated {fmtTime(page.updatedAt)}</span></span>
+              <span className="flex items-center gap-2"><TextSize /><Badge tone={page.updatedBy === 'agent' ? 'accent' : 'neutral'}>{page.updatedBy === 'agent' ? 'written by agent' : 'written by you'}</Badge><span>Updated {fmtTime(page.updatedAt)}</span></span>
             </header>
             {!edit ? (<>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-mute">Page / {String(idx + 1).padStart(2, '0')}</p>
+              <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-[0.2em] text-mute">Page / {String(idx + 1).padStart(2, '0')}</p>
               <h1 className="text-5xl font-extrabold leading-tight">{page.title}</h1>
               {page.summary && <p className="mt-3 max-w-2xl text-lg text-mute">{page.summary}</p>}
               <div className="mt-6 flex flex-wrap gap-2">
