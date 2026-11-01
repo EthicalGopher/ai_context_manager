@@ -7,6 +7,7 @@ package pagehtml
 import (
 	"archive/zip"
 	"bytes"
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"html"
@@ -24,6 +25,15 @@ import (
 
 	"aicw/internal/media"
 )
+
+// The media viewer (video player and image viewer with zoom/pan) is shared
+// with the app's front end, which imports these same two files.
+//
+//go:embed viewer/mediaViewer.js
+var viewerJS string
+
+//go:embed viewer/mediaViewer.css
+var viewerCSS string
 
 // EmbedLimit is the most media (in bytes) that is embedded into a single
 // HTML file. Above it the export becomes a zip with a media/ folder.
@@ -172,12 +182,14 @@ func (r *mediaRenderer) src(m Media) string {
 func (r *mediaRenderer) figure(w util.BufWriter, m Media, caption string) {
 	src := r.src(m)
 	cap := html.EscapeString(caption)
+	if m.Kind == "image" || m.Kind == "video" {
+		// Mounted by the viewer script: zoom, pan, and a full player for video.
+		fmt.Fprintf(w, `<figure class="v"><div class="mv" data-kind="%s" data-src="%s" data-caption="%s"></div><noscript>%s</noscript></figure>`,
+			m.Kind, src, cap, r.plain(m, src, cap))
+		return
+	}
 	w.WriteString(`<figure class="m ` + html.EscapeString(m.Kind) + `">`)
 	switch m.Kind {
-	case "image":
-		fmt.Fprintf(w, `<img src="%s" alt="%s" loading="lazy">`, src, cap)
-	case "video":
-		fmt.Fprintf(w, `<video src="%s" controls playsinline preload="metadata"></video>`, src)
 	case "audio":
 		fmt.Fprintf(w, `<audio src="%s" controls preload="metadata"></audio>`, src)
 	default:
@@ -187,6 +199,14 @@ func (r *mediaRenderer) figure(w util.BufWriter, m Media, caption string) {
 		w.WriteString(`<figcaption>` + cap + `</figcaption>`)
 	}
 	w.WriteString(`</figure>`)
+}
+
+// plain is the no-script fallback for an image or video.
+func (r *mediaRenderer) plain(m Media, src, cap string) string {
+	if m.Kind == "image" {
+		return `<img src="` + src + `" alt="` + cap + `" style="max-width:100%">`
+	}
+	return `<video src="` + src + `" controls playsinline preload="metadata" style="max-width:100%"></video>`
 }
 
 func (r *mediaRenderer) image(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -231,12 +251,12 @@ func (r *mediaRenderer) link(w util.BufWriter, source []byte, n ast.Node, enteri
 func page(title, summary, content string) string {
 	var b strings.Builder
 	t := html.EscapeString(title)
-	b.WriteString(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>` + t + `</title><style>` + css + `</style></head><body><main><h1>` + t + `</h1>`)
+	b.WriteString(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>` + t + `</title><style>` + css + viewerCSS + viewerOverrides + `</style></head><body><main><h1>` + t + `</h1>`)
 	if strings.TrimSpace(summary) != "" {
 		b.WriteString(`<p class="lede">` + html.EscapeString(summary) + `</p>`)
 	}
 	b.WriteString(content)
-	b.WriteString(`</main><script>` + js + `</script></body></html>`)
+	b.WriteString(`</main><script>` + viewerJS + ";\n" + js + `</script></body></html>`)
 	return b.String()
 }
 
@@ -255,7 +275,8 @@ figure.m figcaption{position:absolute;left:.7rem;bottom:.7rem;background:rgba(0,
 figure.audio figcaption{background:none;color:var(--mute)}
 @media print{figure.m video,figure.m audio{display:none}}`
 
-// Only one video/audio plays at a time, and playback stops when scrolled away.
-const js = `(function(){var cur=null;document.addEventListener('play',function(e){if(cur&&cur!==e.target)cur.pause();cur=e.target},true);
-if('IntersectionObserver'in window){var io=new IntersectionObserver(function(es){es.forEach(function(x){if(!x.isIntersecting&&!x.target.paused)x.target.pause()})},{threshold:.1});
-document.querySelectorAll('video').forEach(function(v){io.observe(v)})}})();`
+// The viewer's own colours follow the page theme; its default tokens are RGB triplets, the page's are hex.
+const viewerOverrides = `.mv{--mv-accent:var(--accent);border-color:var(--line)}figure.v{margin:0}@media print{.mv{display:none}}`
+
+// Mount the viewers; audio still plays one at a time.
+const js = `(function(){window.aicwMountAll(document);var cur=null;document.addEventListener('play',function(e){if(e.target.tagName==='AUDIO'){if(cur&&cur!==e.target)cur.pause();cur=e.target}},true)})();`

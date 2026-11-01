@@ -274,4 +274,4 @@
     var list = (scope || document).querySelectorAll('.mv[data-src]')
     for (var i = 0; i < list.length; i++) window.aicwMountViewer(list[i])
   }
-})()
+})();

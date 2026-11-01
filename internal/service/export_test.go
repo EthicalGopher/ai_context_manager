@@ -45,7 +45,7 @@ func TestExportPageSingleHTML(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := b.String()
-	for _, want := range []string{"<title>My: Page</title>", "A summary", "<h2>Hello</h2>", `<video src="data:video/mp4;base64,`, "controls", "playsinline"} {
+	for _, want := range []string{"<title>My: Page</title>", "A summary", "<h2>Hello</h2>", `data-kind="video" data-src="data:video/mp4;base64,`, "aicwMountViewer", ".mv-stage", "Zoom in"} {
 		if !strings.Contains(h, want) {
 			t.Errorf("missing %q", want)
 		}

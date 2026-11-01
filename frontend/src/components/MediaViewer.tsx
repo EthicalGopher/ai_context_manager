@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import '../lib/mediaViewer.js'
+import '../../../internal/pagehtml/viewer/mediaViewer.js'
 
-/** Video player / image viewer with zoom and pan (see lib/mediaViewer.js). Mounted once per source so playback survives parent re-renders. */
+/** Video player / image viewer with zoom and pan (see internal/pagehtml/viewer/mediaViewer.js). Mounted once per source so playback survives parent re-renders. */
 export function MediaViewer({ kind, src, caption = '' }: { kind: 'video' | 'image'; src: string; caption?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
